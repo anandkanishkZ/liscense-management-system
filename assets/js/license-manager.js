@@ -58,6 +58,20 @@ function initializeLicenseManager() {
             closeAllModals();
         }
     });
+    
+    // Add event listeners for step navigation buttons
+    const nextBtn = document.getElementById('nextStepBtn');
+    const prevBtn = document.getElementById('prevStepBtn');
+    
+    if (nextBtn) {
+        nextBtn.addEventListener('click', nextStep);
+    }
+    
+    if (prevBtn) {
+        prevBtn.addEventListener('click', previousStep);
+    }
+    
+    console.log('License manager initialized successfully');
 }
 
 /**
@@ -77,12 +91,37 @@ function formatDateTimeLocal(date) {
  * Step Navigation Functions
  */
 function nextStep() {
-    if (validateCurrentStep()) {
+    console.log('Next step clicked, current step:', currentStep);
+    
+    // Simple validation - just check if required fields have values
+    const currentStepElement = document.querySelector(`.form-step[data-step="${currentStep}"]`);
+    let canProceed = true;
+    
+    if (currentStepElement) {
+        const requiredFields = currentStepElement.querySelectorAll('[required]');
+        requiredFields.forEach(field => {
+            if (!field.value.trim()) {
+                canProceed = false;
+                field.classList.add('invalid');
+                field.style.borderColor = '#ef4444';
+            } else {
+                field.classList.remove('invalid');
+                field.classList.add('valid');
+                field.style.borderColor = '#10b981';
+            }
+        });
+    }
+    
+    if (canProceed) {
         if (currentStep < totalSteps) {
             currentStep++;
+            console.log('Moving to step:', currentStep);
             showStep(currentStep);
             updatePreview();
         }
+    } else {
+        console.log('Validation failed for step:', currentStep);
+        showFormMessage('Please fill in all required fields before continuing.', 'error');
     }
 }
 
@@ -94,20 +133,45 @@ function previousStep() {
 }
 
 function showStep(step) {
-    // Hide all steps
-    document.querySelectorAll('.form-step').forEach(stepElement => {
+    console.log('showStep called with step:', step);
+    
+    // Hide all form steps
+    const allSteps = document.querySelectorAll('.form-step');
+    allSteps.forEach((stepElement, index) => {
         stepElement.style.display = 'none';
+        stepElement.style.opacity = '0';
+        stepElement.style.transform = 'translateX(20px)';
+        stepElement.classList.remove('active');
+        console.log('Hiding step', index + 1, 'with data-step:', stepElement.getAttribute('data-step'));
     });
     
     // Show current step
-    const currentStepElement = document.querySelector(`[data-step="${step}"]`);
+    const currentStepElement = document.querySelector(`.form-step[data-step="${step}"]`);
+    console.log('Looking for step with data-step:', step);
+    console.log('Found current step element:', currentStepElement);
+    
     if (currentStepElement) {
         currentStepElement.style.display = 'block';
+        currentStepElement.style.opacity = '1';
+        currentStepElement.style.transform = 'translateX(0)';
+        currentStepElement.classList.add('active');
+        console.log('Successfully showing step:', step);
+        
+        // Smooth scroll to top of modal body
+        const modalBody = document.querySelector('.enhanced-modal-body');
+        if (modalBody) {
+            modalBody.scrollTop = 0;
+        }
+    } else {
+        console.error('Could not find step element for step:', step);
+        console.log('Available steps:', Array.from(allSteps).map(s => s.getAttribute('data-step')));
     }
     
     // Update progress indicators
-    document.querySelectorAll('.step').forEach((stepElement, index) => {
-        if (index + 1 <= step) {
+    const progressSteps = document.querySelectorAll('.progress-steps .step');
+    progressSteps.forEach((stepElement, index) => {
+        const stepNumber = index + 1;
+        if (stepNumber <= step) {
             stepElement.classList.add('active');
         } else {
             stepElement.classList.remove('active');
@@ -148,10 +212,12 @@ function updateNavigationButtons() {
 
 function resetSteps() {
     currentStep = 1;
+    console.log('Resetting steps to 1');
     
     // Clear all validation states
-    document.querySelectorAll('.enhanced-input, .enhanced-select, .enhanced-textarea').forEach(input => {
+    document.querySelectorAll('.enhanced-input, .enhanced-select, .enhanced-textarea, input, select, textarea').forEach(input => {
         input.classList.remove('valid', 'invalid');
+        input.style.borderColor = '';
     });
     
     // Hide all error messages
@@ -166,6 +232,9 @@ function resetSteps() {
         formMessages.style.display = 'none';
         formMessages.className = 'form-messages';
     }
+    
+    // Show step 1
+    showStep(1);
 }
 
 /**
@@ -181,11 +250,17 @@ function validateCurrentStep() {
     const requiredFields = currentStepElement.querySelectorAll('[required]');
     
     requiredFields.forEach(field => {
-        if (!validateField({ target: field })) {
+        const fieldIsValid = field.value.trim() !== '';
+        if (!fieldIsValid) {
             isValid = false;
+            field.classList.add('invalid');
+            field.classList.remove('valid');
             if (!firstInvalidField) {
                 firstInvalidField = field;
             }
+        } else {
+            field.classList.add('valid');
+            field.classList.remove('invalid');
         }
     });
     
@@ -476,6 +551,8 @@ function openCreateLicenseModal() {
     currentEditingLicense = null;
     currentStep = 1;
     
+    console.log('Opening create license modal');
+    
     // Reset modal state
     document.getElementById('modalTitle').textContent = 'Create New License';
     const modalSubtitle = document.querySelector('.modal-subtitle');
@@ -483,42 +560,54 @@ function openCreateLicenseModal() {
         modalSubtitle.textContent = 'Generate a new software license for your customer';
     }
     
-    document.getElementById('licenseForm').reset();
+    // Reset form
+    const form = document.getElementById('licenseForm');
+    if (form) {
+        form.reset();
+    }
     document.getElementById('licenseId').value = '';
     
-    // Show/hide appropriate elements for create mode
+    // Show progress indicator
     const progressElement = document.getElementById('licenseProgress');
     if (progressElement) {
         progressElement.style.display = 'block';
+        console.log('Progress element shown');
     }
     
+    // Hide status field for create mode
     const statusElement = document.getElementById('status');
     if (statusElement && statusElement.parentElement) {
         statusElement.parentElement.style.display = 'none';
     }
     
-    // Reset all steps
+    // Clear any previous validation states
+    document.querySelectorAll('.form-step input, .form-step select, .form-step textarea').forEach(field => {
+        field.classList.remove('valid', 'invalid');
+        field.style.borderColor = '';
+    });
+    
+    // Reset and show first step
     resetSteps();
     showStep(1);
     
     // Set default values
     setDefaultValues();
     
-    // Initialize form validation
-    initializeFormValidation();
-    
     // Show modal
     const modal = document.getElementById('licenseModal');
     modal.style.display = 'flex';
     modal.classList.add('show');
     
-    // Focus first input
+    console.log('Modal should be visible now');
+    
+    // Focus first input after a short delay
     setTimeout(() => {
         const firstInput = document.getElementById('productName');
         if (firstInput) {
             firstInput.focus();
+            console.log('First input focused');
         }
-    }, 100);
+    }, 200);
 }
 
 /**
