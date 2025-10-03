@@ -1,0 +1,786 @@
+<?php
+/**
+ * Zwicky Technology License Management System
+ * Database Schema Installation
+ * 
+ * @author Zwicky Technology
+ * @version 1.0.0
+ * @since 2024
+ */
+
+// Enable error reporting for debugging
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
+// Try to include config file - handle missing gracefully
+$configPaths = [
+    'config/config.php',
+    '../config/config.php',
+    dirname(__FILE__) . '/config/config.php'
+];
+
+$configLoaded = false;
+foreach ($configPaths as $configPath) {
+    if (file_exists($configPath)) {
+        require_once $configPath;
+        $configLoaded = true;
+        break;
+    }
+}
+
+// If config not found, define basic constants for installation
+if (!$configLoaded) {
+    define('LMS_SECURE', true);
+    define('LMS_VERSION', '1.0.0');
+    
+    // Include database config directly
+    $dbConfigPaths = [
+        'config/database.php',
+        '../config/database.php',
+        dirname(__FILE__) . '/config/database.php'
+    ];
+    
+    foreach ($dbConfigPaths as $dbPath) {
+        if (file_exists($dbPath)) {
+            require_once $dbPath;
+            break;
+        }
+    }
+    
+    // If database config also missing, define minimal defaults
+    if (!defined('LMS_DB_HOST')) {
+        define('LMS_DB_HOST', 'localhost');
+        define('LMS_DB_NAME', 'license_system');
+        define('LMS_DB_USER', 'root');
+        define('LMS_DB_PASS', '');
+        define('LMS_DB_CHARSET', 'utf8mb4');
+        
+        // Table Names
+        define('LMS_TABLE_LICENSES', 'zwicky_licenses');
+        define('LMS_TABLE_ACTIVATIONS', 'zwicky_activations');
+        define('LMS_TABLE_ADMIN_USERS', 'zwicky_admin_users');
+        define('LMS_TABLE_LOGS', 'zwicky_logs');
+    }
+}
+
+class LMSInstaller {
+    private $db;
+    private $dbConfig;
+    
+    public function __construct($customConfig = null) {
+        if ($customConfig) {
+            // Use custom database configuration
+            $this->dbConfig = [
+                'host' => $customConfig['db_host'],
+                'name' => $customConfig['db_name'],
+                'user' => $customConfig['db_user'],
+                'pass' => $customConfig['db_pass'],
+                'charset' => $customConfig['db_charset'] ?? 'utf8mb4'
+            ];
+            
+            try {
+                $dsn = "mysql:host={$this->dbConfig['host']};dbname={$this->dbConfig['name']};charset={$this->dbConfig['charset']}";
+                $this->db = new PDO($dsn, $this->dbConfig['user'], $this->dbConfig['pass'], [
+                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                    PDO::ATTR_EMULATE_PREPARES => false,
+                    PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES {$this->dbConfig['charset']}",
+                    PDO::ATTR_PERSISTENT => false,
+                    PDO::ATTR_TIMEOUT => 30
+                ]);
+            } catch (Exception $e) {
+                die("Database connection failed with custom configuration: " . $e->getMessage());
+            }
+        } else {
+            // Use default configuration
+            $this->dbConfig = [
+                'host' => LMS_DB_HOST,
+                'name' => LMS_DB_NAME,
+                'user' => LMS_DB_USER,
+                'pass' => LMS_DB_PASS,
+                'charset' => LMS_DB_CHARSET
+            ];
+            
+            try {
+                $this->db = getLMSDatabase();
+            } catch (Exception $e) {
+                die("Database connection failed: " . $e->getMessage());
+            }
+        }
+    }
+    
+    public function install() {
+        echo "<h2>Zwicky Technology License Management System - Installation</h2>\n";
+        
+        try {
+            $this->createTables();
+            $this->insertSampleData();
+            $this->createEnvFile();
+            echo "<p style='color: green;'>✅ Installation completed successfully!</p>\n";
+            echo "<p><strong>Default Admin Credentials:</strong></p>\n";
+            echo "<p>Username: admin<br>Password: ZwickyAdmin2024</p>\n";
+            echo "<div style='margin: 20px 0; padding: 15px; background: #d1ecf1; border-left: 4px solid #007cba; border-radius: 4px;'>\n";
+            echo "<h4 style='margin: 0 0 10px 0; color: #0c5460;'>🎉 Installation Complete!</h4>\n";
+            echo "<div style='background: #d4edda; padding: 10px; border-radius: 4px; margin: 10px 0;'>\n";
+            echo "<strong>✅ Created:</strong>\n";
+            echo "<ul style='margin: 5px 0;'>\n";
+            echo "<li>4 optimized database tables with indexes</li>\n";
+            echo "<li>Default admin user with secure authentication</li>\n";
+            echo "<li>Production .env configuration file</li>\n";
+            echo "<li>Sample license for testing</li>\n";
+            echo "</ul>\n";
+            echo "</div>\n";
+            echo "<h4 style='margin: 10px 0 5px 0; color: #007cba;'>📚 Next Steps:</h4>\n";
+            echo "<p style='margin: 5px 0;'><a href='../admin/login.php' style='color: #007cba; text-decoration: none; font-weight: bold;'>🚀 Go to Admin Panel</a></p>\n";
+            echo "<p style='margin: 5px 0;'><a href='../ACTIVATION_GUIDE.md' target='_blank' style='color: #28a745; text-decoration: none; font-weight: bold;'>📖 View Complete Activation Guide</a> - Detailed feature listing & setup instructions</p>\n";
+            echo "<p style='margin: 5px 0;'><strong style='color: #dc3545;'>⚠️ Important:</strong> Change default admin password immediately!</p>\n";
+            echo "</div>\n";
+        } catch (Exception $e) {
+            echo "<p style='color: red;'>❌ Installation failed: " . $e->getMessage() . "</p>\n";
+        }
+    }
+    
+    private function createEnvFile() {
+        echo "Creating production .env configuration file...<br>\n";
+        
+        $envContent = "# ================================================\n";
+        $envContent .= "# Zwicky Technology License Management System\n";
+        $envContent .= "# Production Environment Configuration\n";
+        $envContent .= "# Generated: " . date('Y-m-d H:i:s') . "\n";
+        $envContent .= "# ================================================\n\n";
+        
+        $envContent .= "# Database Configuration\n";
+        $envContent .= "LMS_DB_HOST=" . $this->dbConfig['host'] . "\n";
+        $envContent .= "LMS_DB_NAME=" . $this->dbConfig['name'] . "\n";
+        $envContent .= "LMS_DB_USER=" . $this->dbConfig['user'] . "\n";
+        $envContent .= "LMS_DB_PASS=" . $this->dbConfig['pass'] . "\n";
+        $envContent .= "LMS_DB_CHARSET=" . $this->dbConfig['charset'] . "\n\n";
+        
+        $envContent .= "# Application Configuration\n";
+        $envContent .= "APP_ENV=production\n";
+        $envContent .= "APP_DEBUG=false\n";
+        $envContent .= "APP_URL=" . (isset($_SERVER['HTTPS']) ? 'https://' : 'http://') . $_SERVER['HTTP_HOST'] . "\n\n";
+        
+        $envContent .= "# Security Configuration\n";
+        $envContent .= "SESSION_LIFETIME=7200\n";
+        $envContent .= "LOGIN_ATTEMPTS_LIMIT=5\n";
+        $envContent .= "LOCKOUT_DURATION=1800\n\n";
+        
+        $envContent .= "# Email Configuration (Optional - Configure for notifications)\n";
+        $envContent .= "MAIL_DRIVER=smtp\n";
+        $envContent .= "MAIL_HOST=your_smtp_host\n";
+        $envContent .= "MAIL_PORT=587\n";
+        $envContent .= "MAIL_USERNAME=your_email@domain.com\n";
+        $envContent .= "MAIL_PASSWORD=your_email_password\n";
+        $envContent .= "MAIL_ENCRYPTION=tls\n";
+        $envContent .= "MAIL_FROM_ADDRESS=noreply@yourdomain.com\n";
+        $envContent .= "MAIL_FROM_NAME=\"License Management System\"\n\n";
+        
+        $envContent .= "# License Configuration\n";
+        $envContent .= "DEFAULT_LICENSE_DURATION=365\n";
+        $envContent .= "EXPIRATION_WARNING_DAYS=30\n";
+        $envContent .= "EXPIRATION_CRITICAL_DAYS=7\n\n";
+        
+        $envContent .= "# Backup Configuration\n";
+        $envContent .= "BACKUP_ENABLED=true\n";
+        $envContent .= "BACKUP_RETENTION_DAYS=30\n\n";
+        
+        $envContent .= "# ================================================\n";
+        $envContent .= "# SECURITY WARNING:\n";
+        $envContent .= "# Keep this file secure and never commit to version control!\n";
+        $envContent .= "# Change default admin password immediately!\n";
+        $envContent .= "# ================================================\n";
+        
+        $envFile = '../.env';
+        
+        if (file_put_contents($envFile, $envContent)) {
+            echo "✅ Production .env file created successfully<br>\n";
+            echo "📁 Location: " . realpath($envFile) . "<br>\n";
+            echo "🔒 <strong>Security Note:</strong> .env file contains sensitive information - keep it secure!<br>\n";
+        } else {
+            echo "⚠️ Could not create .env file - you may need to create it manually<br>\n";
+        }
+    }
+    
+    private function createTables() {
+        echo "Creating database tables...<br>\n";
+        
+        // Licenses table
+        $sql = "CREATE TABLE IF NOT EXISTS " . LMS_TABLE_LICENSES . " (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            license_key VARCHAR(35) UNIQUE NOT NULL,
+            product_name VARCHAR(100) NOT NULL,
+            customer_name VARCHAR(100) NOT NULL,
+            customer_email VARCHAR(100) NOT NULL,
+            allowed_domains TEXT,
+            max_activations INT DEFAULT 1,
+            current_activations INT DEFAULT 0,
+            status ENUM('active', 'suspended', 'expired') DEFAULT 'active',
+            expires_at DATETIME NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            notes TEXT,
+            INDEX idx_license_key (license_key),
+            INDEX idx_customer_email (customer_email),
+            INDEX idx_status (status),
+            INDEX idx_expires_at (expires_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+        
+        $this->db->exec($sql);
+        echo "✅ Licenses table created<br>\n";
+        
+        // Activations table
+        $sql = "CREATE TABLE IF NOT EXISTS " . LMS_TABLE_ACTIVATIONS . " (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            license_id INT NOT NULL,
+            domain VARCHAR(255) NOT NULL,
+            ip_address VARCHAR(45),
+            user_agent TEXT,
+            activation_token VARCHAR(64) UNIQUE,
+            status ENUM('active', 'inactive') DEFAULT 'active',
+            last_check TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            FOREIGN KEY (license_id) REFERENCES " . LMS_TABLE_LICENSES . "(id) ON DELETE CASCADE,
+            UNIQUE KEY unique_license_domain (license_id, domain),
+            INDEX idx_domain (domain),
+            INDEX idx_activation_token (activation_token),
+            INDEX idx_status (status),
+            INDEX idx_last_check (last_check)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+        
+        $this->db->exec($sql);
+        echo "✅ Activations table created<br>\n";
+        
+        // Admin users table
+        $sql = "CREATE TABLE IF NOT EXISTS " . LMS_TABLE_ADMIN_USERS . " (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            username VARCHAR(50) UNIQUE NOT NULL,
+            email VARCHAR(100) UNIQUE NOT NULL,
+            password_hash VARCHAR(255) NOT NULL,
+            full_name VARCHAR(100),
+            role ENUM('admin', 'manager', 'viewer') DEFAULT 'admin',
+            status ENUM('active', 'inactive') DEFAULT 'active',
+            last_login TIMESTAMP NULL,
+            login_attempts INT DEFAULT 0,
+            locked_until TIMESTAMP NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_username (username),
+            INDEX idx_email (email),
+            INDEX idx_status (status)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+        
+        $this->db->exec($sql);
+        echo "✅ Admin users table created<br>\n";
+        
+        // Logs table
+        $sql = "CREATE TABLE IF NOT EXISTS " . LMS_TABLE_LOGS . " (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            level ENUM('DEBUG', 'INFO', 'WARNING', 'ERROR') DEFAULT 'INFO',
+            message TEXT NOT NULL,
+            context JSON,
+            ip_address VARCHAR(45),
+            user_agent TEXT,
+            license_key VARCHAR(35),
+            admin_user_id INT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_level (level),
+            INDEX idx_license_key (license_key),
+            INDEX idx_admin_user_id (admin_user_id),
+            INDEX idx_created_at (created_at),
+            FOREIGN KEY (admin_user_id) REFERENCES " . LMS_TABLE_ADMIN_USERS . "(id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+        
+        $this->db->exec($sql);
+        echo "✅ Logs table created<br>\n";
+    }
+    
+    private function insertSampleData() {
+        echo "Inserting sample data...<br>\n";
+        
+        // Create default admin user
+        $password_hash = password_hash('ZwickyAdmin2024', PASSWORD_DEFAULT);
+        $sql = "INSERT IGNORE INTO " . LMS_TABLE_ADMIN_USERS . " 
+                (username, email, password_hash, full_name, role) 
+                VALUES ('admin', 'admin@zwickytechnology.com', ?, 'System Administrator', 'admin')";
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$password_hash]);
+        echo "✅ Default admin user created<br>\n";
+        
+        // Create sample license
+        $license_key = lms_generate_license_key();
+        $sql = "INSERT IGNORE INTO " . LMS_TABLE_LICENSES . " 
+                (license_key, product_name, customer_name, customer_email, allowed_domains, max_activations, expires_at, notes) 
+                VALUES (?, 'Zwicky News Portal Theme', 'Sample Customer', 'customer@example.com', 'example.com', 3, DATE_ADD(NOW(), INTERVAL 1 YEAR), 'Sample license for testing')";
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$license_key]);
+        echo "✅ Sample license created: " . $license_key . "<br>\n";
+        
+        // Log installation
+        $sql = "INSERT INTO " . LMS_TABLE_LOGS . " (level, message, context, ip_address) 
+                VALUES ('INFO', 'License Management System installed successfully', ?, ?)";
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([
+            json_encode(['version' => LMS_VERSION, 'installer' => 'auto']),
+            $_SERVER['REMOTE_ADDR'] ?? 'localhost'
+        ]);
+        echo "✅ Installation logged<br>\n";
+    }
+    
+    public function uninstall() {
+        echo "<h2>Uninstalling Zwicky License Management System</h2>\n";
+        
+        try {
+            $tables = [
+                LMS_TABLE_LOGS,
+                LMS_TABLE_ACTIVATIONS,
+                LMS_TABLE_LICENSES,
+                LMS_TABLE_ADMIN_USERS
+            ];
+            
+            foreach ($tables as $table) {
+                $this->db->exec("DROP TABLE IF EXISTS $table");
+                echo "✅ Dropped table: $table<br>\n";
+            }
+            
+            echo "<p style='color: green;'>✅ Uninstallation completed successfully!</p>\n";
+        } catch (Exception $e) {
+            echo "<p style='color: red;'>❌ Uninstallation failed: " . $e->getMessage() . "</p>\n";
+        }
+    }
+}
+
+// Helper functions for installation
+if (!function_exists('getLMSDatabase')) {
+    function getLMSDatabase() {
+        $db_options = [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES => false,
+            PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES " . LMS_DB_CHARSET,
+            PDO::ATTR_PERSISTENT => false,
+            PDO::ATTR_TIMEOUT => 30
+        ];
+        
+        try {
+            $dsn = "mysql:host=" . LMS_DB_HOST . ";dbname=" . LMS_DB_NAME . ";charset=" . LMS_DB_CHARSET;
+            $pdo = new PDO($dsn, LMS_DB_USER, LMS_DB_PASS, $db_options);
+            return $pdo;
+        } catch (PDOException $e) {
+            throw new Exception("Database connection failed: " . $e->getMessage());
+        }
+    }
+}
+
+if (!function_exists('testLMSConnection')) {
+    function testLMSConnection() {
+        try {
+            $db = getLMSDatabase();
+            return true;
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+}
+
+if (!function_exists('lms_generate_license_key')) {
+    function lms_generate_license_key($length = 32) {
+        $characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        $key = '';
+        for ($i = 0; $i < $length; $i++) {
+            $key .= $characters[random_int(0, strlen($characters) - 1)];
+        }
+        return 'ZWICKY-' . substr($key, 0, 8) . '-' . substr($key, 8, 8) . '-' . substr($key, 16, 8) . '-' . substr($key, 24, 8);
+    }
+}
+
+// Function to show PHP info for debugging
+function showPHPInfo() {
+    ?>
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>PHP Diagnostic - Zwicky License Management System</title>
+        <style>
+            body { font-family: Arial, sans-serif; max-width: 1000px; margin: 20px auto; padding: 20px; }
+            .header { background: #007cba; color: white; padding: 15px; border-radius: 4px; margin-bottom: 20px; }
+            .info-section { background: #f8f9fa; padding: 15px; border-radius: 4px; margin: 15px 0; }
+            .error { background: #f8d7da; color: #721c24; }
+            .success { background: #d4edda; color: #155724; }
+            .warning { background: #fff3cd; color: #856404; }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h1>🔧 PHP Environment Diagnostic</h1>
+            <p>This page helps diagnose installation issues</p>
+        </div>
+        
+        <div class="info-section">
+            <h3>📊 PHP Configuration</h3>
+            <ul>
+                <li><strong>PHP Version:</strong> <?php echo PHP_VERSION; ?></li>
+                <li><strong>Server Software:</strong> <?php echo $_SERVER['SERVER_SOFTWARE'] ?? 'Unknown'; ?></li>
+                <li><strong>Document Root:</strong> <?php echo $_SERVER['DOCUMENT_ROOT'] ?? 'Unknown'; ?></li>
+                <li><strong>Script Path:</strong> <?php echo __FILE__; ?></li>
+            </ul>
+        </div>
+        
+        <div class="info-section">
+            <h3>🔍 Required Extensions</h3>
+            <?php
+            $required_extensions = ['pdo', 'pdo_mysql', 'json', 'mbstring'];
+            foreach ($required_extensions as $ext) {
+                $loaded = extension_loaded($ext);
+                $class = $loaded ? 'success' : 'error';
+                $icon = $loaded ? '✅' : '❌';
+                echo "<div class='$class' style='padding: 5px; margin: 5px 0; border-radius: 4px;'>$icon $ext</div>";
+            }
+            ?>
+        </div>
+        
+        <div class="info-section">
+            <h3>📁 File System Check</h3>
+            <?php
+            $files_to_check = [
+                'config/config.php',
+                'config/database.php',
+                '../config/config.php',
+                '../config/database.php'
+            ];
+            foreach ($files_to_check as $file) {
+                $exists = file_exists($file);
+                $class = $exists ? 'success' : 'warning';
+                $icon = $exists ? '✅' : '⚠️';
+                echo "<div class='$class' style='padding: 5px; margin: 5px 0; border-radius: 4px;'>$icon $file</div>";
+            }
+            ?>
+        </div>
+        
+        <div class="info-section">
+            <h3>⚙️ Error Log Check</h3>
+            <?php
+            $error_log = ini_get('error_log');
+            echo "<p><strong>Error Log Location:</strong> " . ($error_log ?: 'Default system log') . "</p>";
+            echo "<p><strong>Display Errors:</strong> " . (ini_get('display_errors') ? 'On' : 'Off') . "</p>";
+            echo "<p><strong>Log Errors:</strong> " . (ini_get('log_errors') ? 'On' : 'Off') . "</p>";
+            ?>
+        </div>
+        
+        <div class="info-section">
+            <h3>🔗 Quick Actions</h3>
+            <p>
+                <a href="install.php" style="background: #007cba; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px; margin: 5px;">← Back to Installation</a>
+                <a href="?action=configure" style="background: #28a745; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px; margin: 5px;">Configure Database</a>
+            </p>
+        </div>
+        
+        <div class="info-section">
+            <h3>📋 Full PHP Info</h3>
+            <details>
+                <summary style="cursor: pointer; background: #007cba; color: white; padding: 10px; border-radius: 4px;">Click to View Full PHP Configuration</summary>
+                <div style="margin-top: 15px;">
+                    <?php phpinfo(); ?>
+                </div>
+            </details>
+        </div>
+    </body>
+    </html>
+    <?php
+}
+
+// Function to show database configuration form
+function showDatabaseConfigForm() {
+    ?>
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Database Configuration - Zwicky License Management System</title>
+        <style>
+            body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; background: #f5f5f5; }
+            .container { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+            h1 { color: #333; text-align: center; margin-bottom: 30px; }
+            .form-group { margin-bottom: 20px; }
+            label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
+            input[type="text"], input[type="password"], select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+            input:focus { border-color: #007cba; outline: none; box-shadow: 0 0 5px rgba(0,124,186,0.3); }
+            .button { background: #007cba; color: white; padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; text-decoration: none; display: inline-block; margin: 10px 5px 0 0; }
+            .button:hover { background: #005a8b; }
+            .button.secondary { background: #6c757d; }
+            .button.secondary:hover { background: #545b62; }
+            .info-box { background: #d1ecf1; padding: 15px; border-radius: 4px; margin: 15px 0; border-left: 4px solid #007cba; }
+            .warning-box { background: #fff3cd; padding: 15px; border-radius: 4px; margin: 15px 0; border-left: 4px solid #ffc107; }
+            .required { color: red; }
+            .help-text { font-size: 12px; color: #666; margin-top: 5px; }
+            .cpanel-example { background: #e8f5e8; padding: 10px; border-radius: 4px; margin: 10px 0; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🗄️ Database Configuration</h1>
+            
+            <div class="info-box">
+                <h3>🚀 Configure Your Production Database</h3>
+                <p>Enter your database details below. The system will test the connection and create all necessary tables automatically.</p>
+            </div>
+            
+            <form method="POST" action="?action=install">
+                <div class="form-group">
+                    <label for="db_host">Database Host <span class="required">*</span></label>
+                    <input type="text" id="db_host" name="db_host" value="localhost" required>
+                    <div class="help-text">Usually "localhost" for most hosting providers</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="db_name">Database Name <span class="required">*</span></label>
+                    <input type="text" id="db_name" name="db_name" placeholder="your_database_name" required>
+                    <div class="help-text">The name of your MySQL database</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="db_user">Database Username <span class="required">*</span></label>
+                    <input type="text" id="db_user" name="db_user" placeholder="your_db_username" required>
+                    <div class="help-text">MySQL user with full privileges to the database</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="db_pass">Database Password <span class="required">*</span></label>
+                    <input type="password" id="db_pass" name="db_pass" placeholder="your_secure_password" required>
+                    <div class="help-text">Password for the MySQL user</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="db_charset">Character Set</label>
+                    <select id="db_charset" name="db_charset">
+                        <option value="utf8mb4" selected>utf8mb4 (Recommended - Full Unicode support)</option>
+                        <option value="utf8">utf8 (Basic Unicode support)</option>
+                    </select>
+                    <div class="help-text">utf8mb4 is recommended for full emoji and Unicode support</div>
+                </div>
+                
+                <div class="cpanel-example">
+                    <h4>📋 cPanel Hosting Example:</h4>
+                    <ul>
+                        <li><strong>Host:</strong> localhost</li>
+                        <li><strong>Database:</strong> cpanelusername_license_system</li>
+                        <li><strong>Username:</strong> cpanelusername_lms_user</li>
+                        <li><strong>Password:</strong> your_secure_password</li>
+                    </ul>
+                    <small><em>Replace "cpanelusername" with your actual cPanel username</em></small>
+                </div>
+                
+                <div class="warning-box">
+                    <h4>⚠️ Before You Continue:</h4>
+                    <ul>
+                        <li>Make sure your database exists and is empty</li>
+                        <li>Ensure the database user has full privileges (SELECT, INSERT, UPDATE, DELETE, CREATE, DROP)</li>
+                        <li>Test your database connection in cPanel or phpMyAdmin first</li>
+                    </ul>
+                </div>
+                
+                <button type="submit" class="button">🚀 Install with These Settings</button>
+                <a href="install.php" class="button secondary">← Back to Default Installation</a>
+            </form>
+            
+            <div class="info-box" style="margin-top: 30px;">
+                <h4>📊 What Will Be Created:</h4>
+                <ul>
+                    <li>✅ 4 optimized database tables with proper indexes</li>
+                    <li>✅ Default admin user (admin/ZwickyAdmin2024)</li>
+                    <li>✅ Production .env configuration file</li>
+                    <li>✅ Sample license for testing</li>
+                    <li>✅ Complete audit logging system</li>
+                </ul>
+            </div>
+        </div>
+    </body>
+    </html>
+    <?php
+}
+
+// Check if installation is requested
+if (isset($_GET['action'])) {
+    try {
+        switch ($_GET['action']) {
+            case 'phpinfo':
+                showPHPInfo();
+                break;
+            case 'configure':
+                showDatabaseConfigForm();
+                break;
+            case 'install':
+                if (isset($_POST['db_host'])) {
+                    // Install with custom database configuration
+                    $installer = new LMSInstaller($_POST);
+                    $installer->install();
+                } else {
+                    // Install with default configuration
+                    $installer = new LMSInstaller();
+                    $installer->install();
+                }
+                break;
+        case 'uninstall':
+            if (isset($_GET['confirm']) && $_GET['confirm'] === 'yes') {
+                $installer->uninstall();
+            } else {
+                echo "<p style='color: orange;'>⚠️ Are you sure you want to uninstall? This will delete all data!</p>";
+                echo "<p><a href='?action=uninstall&confirm=yes' style='color: red;'>Yes, Uninstall</a> | <a href='install.php'>Cancel</a></p>";
+            }
+            break;
+        default:
+            echo "<p style='color: red;'>❌ Invalid action</p>";
+        }
+    } catch (Exception $e) {
+        echo "<div style='background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; padding: 15px; border-radius: 4px; margin: 20px;'>";
+        echo "<h3>🚨 Installation Error</h3>";
+        echo "<p><strong>Error:</strong> " . htmlspecialchars($e->getMessage()) . "</p>";
+        echo "<p><a href='install.php'>← Back to Installation</a> | <a href='?action=phpinfo'>View PHP Info</a></p>";
+        echo "</div>";
+    }
+} else {
+    ?>
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Zwicky License Management System - Installation</title>
+        <style>
+            body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; background: #f5f5f5; }
+            .button { display: inline-block; padding: 12px 24px; background: #007cba; color: white; text-decoration: none; border-radius: 6px; margin: 5px; font-weight: bold; transition: all 0.3s ease; }
+            .button:hover { background: #005a87; transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+            .button[disabled] { background: #6c757d; cursor: not-allowed; }
+            .button[disabled]:hover { background: #6c757d; transform: none; box-shadow: none; }
+            .danger { background: #dc3545; }
+            .danger:hover { background: #c82333; }
+            h1, h2, h3 { color: #333; }
+            .container { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🚀 Zwicky Technology License Management System</h1>
+            <h2>Installation Panel</h2>
+            
+            <p>Welcome to the License Management System installation. Configure your database and deploy a professional license management solution.</p>
+        
+        <h3>System Requirements Check</h3>
+        <?php
+        $requirements = [
+            'PHP Version >= 7.4' => version_compare(PHP_VERSION, '7.4.0', '>='),
+            'PDO Extension' => extension_loaded('pdo'),
+            'PDO MySQL Extension' => extension_loaded('pdo_mysql'),
+            'OpenSSL Extension' => extension_loaded('openssl'),
+            'JSON Extension' => extension_loaded('json'),
+            'cURL Extension' => extension_loaded('curl')
+        ];
+        
+        $all_good = true;
+        foreach ($requirements as $requirement => $status) {
+            $icon = $status ? '✅' : '❌';
+            $color = $status ? 'green' : 'red';
+            echo "<p style='color: $color;'>$icon $requirement</p>";
+            if (!$status) $all_good = false;
+        }
+        ?>
+        
+        <h3>Database Connection Test</h3>
+        <?php
+        $db_test = testLMSConnection();
+        $icon = $db_test ? '✅' : '❌';
+        $color = $db_test ? 'green' : 'red';
+        echo "<p style='color: $color;'>$icon Database Connection</p>";
+        if (!$db_test) $all_good = false;
+        ?>
+        
+        <h3>🗄️ Database Configuration for .env File</h3>
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 15px 0;">
+            <p><strong>Current Configuration:</strong></p>
+            <ul>
+                <li><strong>Host:</strong> <?php echo LMS_DB_HOST; ?></li>
+                <li><strong>Database:</strong> <?php echo LMS_DB_NAME; ?></li>
+                <li><strong>User:</strong> <?php echo LMS_DB_USER; ?></li>
+                <li><strong>Password:</strong> <?php echo str_repeat('*', strlen(LMS_DB_PASS)); ?></li>
+            </ul>
+            
+            <div style="background: #d4edda; padding: 10px; border-radius: 4px; margin: 10px 0;">
+                <strong>📝 Note:</strong> Installation will automatically create a <code>.env</code> file with these settings for production security.
+            </div>
+            
+            <details style="margin: 10px 0;">
+                <summary style="cursor: pointer; color: #007cba; font-weight: bold;">🔧 Need to change database settings?</summary>
+                <div style="padding: 10px; background: #fff3cd; border-radius: 4px; margin: 10px 0;">
+                    <p><strong>For cPanel hosting, your database settings typically look like:</strong></p>
+                    <ul>
+                        <li><strong>Host:</strong> localhost</li>
+                        <li><strong>Database:</strong> cpanelusername_dbname</li>
+                        <li><strong>User:</strong> cpanelusername_dbuser</li>
+                        <li><strong>Password:</strong> your_secure_password</li>
+                    </ul>
+                    <p><em>Update these in <code>config/database.php</code> before installation.</em></p>
+                </div>
+            </details>
+        </div>
+        
+        <h3>Actions</h3>
+        <?php if ($all_good): ?>
+            <div style="background: #d1ecf1; padding: 15px; border-radius: 8px; margin: 10px 0;">
+                <h4 style="margin: 0 0 10px 0; color: #0c5460;">🚀 Ready to Install!</h4>
+                <p>Installation will:</p>
+                <ul>
+                    <li>✅ Create 4 optimized database tables</li>
+                    <li>✅ Set up proper indexes for performance</li>
+                    <li>✅ Create default admin user (admin/ZwickyAdmin2024)</li>
+                    <li>✅ Generate secure .env configuration file</li>
+                    <li>✅ Insert sample data for testing</li>
+                </ul>
+            </div>
+            <div style="text-align: center; margin: 20px 0;">
+                <a href="?action=configure" class="button" style="background: #28a745; margin-right: 10px;">🔧 Configure Database Settings</a>
+                <a href="?action=install" class="button">📦 Quick Install (Use Current Settings)</a>
+            </div>
+            
+            <div style="background: #fff3cd; padding: 10px; border-radius: 4px; margin: 10px 0; text-align: center;">
+                <strong>💡 Recommended:</strong> Click "Configure Database Settings" to enter your cPanel database details
+            </div>
+            
+            <div style="text-align: center; margin: 10px 0;">
+                <a href="?action=phpinfo" class="button" style="background: #6c757d; font-size: 12px; padding: 8px 16px;">🔍 PHP Diagnostic (If having issues)</a>
+            </div>
+        <?php else: ?>
+            <p style="color: red;">Please fix the above issues before installing.</p>
+            <div style="text-align: center; margin: 15px 0;">
+                <a href="?action=configure" class="button" disabled style="background: #6c757d;">🔧 Configure Database Settings</a>
+            </div>
+        <?php endif; ?>
+        
+        <a href="?action=uninstall" class="button danger">Uninstall System</a>
+        
+        <h3>Post-Installation</h3>
+        <p>After successful installation:</p>
+        <ul>
+            <li>Access the admin panel at <code>/admin/login.php</code></li>
+            <li>Use the default credentials provided during installation</li>
+            <li>Change the default password immediately</li>
+            <li>Configure your license server settings</li>
+            <li>Create and manage your product licenses</li>
+            <li><strong><a href="ACTIVATION_GUIDE.md" target="_blank" style="color: #28a745; text-decoration: none;">📖 Read the Complete Activation Guide</a></strong> - Comprehensive feature documentation & setup instructions</li>
+        </ul>
+        
+        <div style="margin: 20px 0; padding: 15px; background: #e8f5e8; border: 1px solid #28a745; border-radius: 8px;">
+            <h4 style="margin: 0 0 10px 0; color: #155724;">📚 Documentation Available:</h4>
+            <p style="margin: 5px 0;"><strong><a href="ACTIVATION_GUIDE.md" target="_blank" style="color: #28a745;">🚀 Complete Activation Guide</a></strong> - Step-by-step feature activation & usage</p>
+            <p style="margin: 5px 0;"><strong><a href="DATABASE_CONFIGURATION_GUIDE.md" target="_blank" style="color: #ffc107;">🔧 Database Configuration Guide</a></strong> - Required fields & cPanel setup instructions</p>
+            <p style="margin: 5px 0;"><strong><a href="DATABASE_PRODUCTION_GUIDE.md" target="_blank" style="color: #dc3545;">🗄️ Database Production Guide</a></strong> - Complete database setup, security & maintenance</p>
+            <p style="margin: 5px 0;"><strong><a href="LICENSE_MANAGER_README.md" target="_blank" style="color: #007cba;">📖 System README</a></strong> - Technical overview & implementation details</p>
+            <p style="margin: 5px 0;"><strong><a href="database_schema.sql" target="_blank" style="color: #6f42c1;">📄 Database Schema SQL</a></strong> - Ready-to-use manual installation file</p>
+        </div>
+        </div>
+    </body>
+    </html>
+    <?php
+}
+?>
