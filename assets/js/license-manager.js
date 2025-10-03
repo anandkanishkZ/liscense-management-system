@@ -508,7 +508,9 @@ function openCreateLicenseModal() {
     initializeFormValidation();
     
     // Show modal
-    document.getElementById('licenseModal').style.display = 'flex';
+    const modal = document.getElementById('licenseModal');
+    modal.style.display = 'flex';
+    modal.classList.add('show');
     
     // Focus first input
     setTimeout(() => {
@@ -812,7 +814,9 @@ function validateAllSteps() {
  * Close license modal
  */
 function closeLicenseModal() {
-    document.getElementById('licenseModal').style.display = 'none';
+    const modal = document.getElementById('licenseModal');
+    modal.style.display = 'none';
+    modal.classList.remove('show');
     currentEditingLicense = null;
     currentStep = 1;
     
@@ -1052,6 +1056,7 @@ function closeDetailsModal() {
 function closeAllModals() {
     document.querySelectorAll('.modal').forEach(modal => {
         modal.style.display = 'none';
+        modal.classList.remove('show');
     });
 }
 
