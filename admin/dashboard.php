@@ -40,8 +40,9 @@ $page_title = 'Dashboard';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo $page_title; ?> - Zwicky License Manager</title>
-    <link rel="stylesheet" href="../assets/css/admin.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="../assets/css/admin.css?v=<?php echo time(); ?>">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="dashboard-container">
@@ -51,6 +52,17 @@ $page_title = 'Dashboard';
             <?php include 'includes/topbar.php'; ?>
             
             <div class="content-area">
+                <!-- Header Section -->
+                <div class="page-header">
+                    <div class="page-header-content">
+                        <h1 class="page-title">
+                            <i class="fas fa-tachometer-alt"></i>
+                            Dashboard
+                        </h1>
+                        <p class="page-description">Monitor your license system overview and key metrics</p>
+                    </div>
+                </div>
+
                 <!-- Statistics Cards -->
                 <div class="stats-grid">
                     <div class="stat-card success">

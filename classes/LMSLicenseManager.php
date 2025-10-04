@@ -132,14 +132,36 @@ class LMSLicenseManager {
             $allowed_domains = array_map('trim', explode(',', $license['allowed_domains']));
             $domain = lms_sanitize_domain($domain);
             
-            if (!in_array($domain, $allowed_domains)) {
+            $domain_allowed = false;
+            foreach ($allowed_domains as $allowed_domain) {
+                if ($this->matchesDomain($domain, $allowed_domain)) {
+                    $domain_allowed = true;
+                    break;
+                }
+            }
+            
+            if (!$domain_allowed) {
                 $this->logger->warning("License validation failed - domain not allowed", [
                     'license_key' => $license_key,
                     'domain' => $domain,
                     'allowed_domains' => $allowed_domains
                 ]);
-                return ['valid' => false, 'message' => 'Domain not authorized for this license'];
+                return [
+                    'valid' => false, 
+                    'message' => 'Domain not authorized for this license. Allowed domains: ' . implode(', ', $allowed_domains)
+                ];
             }
+        }
+        
+        // IMPORTANT: If allowed_domains is set, domain parameter is REQUIRED
+        if (!empty($license['allowed_domains']) && empty($domain)) {
+            $this->logger->warning("License validation failed - domain required but not provided", [
+                'license_key' => $license_key
+            ]);
+            return [
+                'valid' => false,
+                'message' => 'Domain is required for this license. This license has domain restrictions.'
+            ];
         }
         
         $this->logger->info("License validated successfully", [
@@ -754,5 +776,126 @@ class LMSLicenseManager {
         }
         
         throw new Exception("Failed to regenerate license key");
+    }
+    
+    /**
+     * Suspend a license (change status to suspended)
+     * 
+     * @param string $license_key The license key to suspend
+     * @param string $reason Optional reason for suspension
+     * @return bool Success status
+     * @throws Exception If license not found or already suspended
+     */
+    public function suspendLicense($license_key, $reason = null) {
+        // Get current license
+        $license = $this->getLicense($license_key);
+        if (!$license) {
+            throw new Exception("License not found");
+        }
+        
+        if ($license['status'] === 'suspended') {
+            throw new Exception("License is already suspended");
+        }
+        
+        // Update status to suspended
+        $sql = "UPDATE " . LMS_TABLE_LICENSES . " 
+                SET status = 'suspended', updated_at = CURRENT_TIMESTAMP 
+                WHERE license_key = :license_key";
+        
+        $stmt = $this->db->prepare($sql);
+        $result = $stmt->execute(['license_key' => $license_key]);
+        
+        if ($result) {
+            $this->logger->warning("License suspended", [
+                'license_key' => $license_key,
+                'previous_status' => $license['status'],
+                'customer_email' => $license['customer_email'],
+                'product' => $license['product_name'],
+                'reason' => $reason ?? 'No reason provided'
+            ]);
+            
+            return true;
+        }
+        
+        throw new Exception("Failed to suspend license");
+    }
+    
+    /**
+     * Unsuspend/Reactivate a license (change status from suspended to active)
+     * 
+     * @param string $license_key The license key to unsuspend
+     * @return bool Success status
+     * @throws Exception If license not found or not suspended
+     */
+    public function unsuspendLicense($license_key) {
+        // Get current license
+        $license = $this->getLicense($license_key);
+        if (!$license) {
+            throw new Exception("License not found");
+        }
+        
+        if ($license['status'] !== 'suspended') {
+            throw new Exception("License is not suspended (current status: {$license['status']})");
+        }
+        
+        // Check if license has expired
+        $new_status = 'active';
+        if ($license['expires_at'] && strtotime($license['expires_at']) < time()) {
+            $new_status = 'expired';
+        }
+        
+        // Update status to active or expired
+        $sql = "UPDATE " . LMS_TABLE_LICENSES . " 
+                SET status = :status, updated_at = CURRENT_TIMESTAMP 
+                WHERE license_key = :license_key";
+        
+        $stmt = $this->db->prepare($sql);
+        $result = $stmt->execute([
+            'status' => $new_status,
+            'license_key' => $license_key
+        ]);
+        
+        if ($result) {
+            $this->logger->info("License unsuspended", [
+                'license_key' => $license_key,
+                'new_status' => $new_status,
+                'customer_email' => $license['customer_email'],
+                'product' => $license['product_name']
+            ]);
+            
+            return true;
+        }
+        
+        throw new Exception("Failed to unsuspend license");
+    }
+    
+    /**
+     * Check if a domain matches an allowed domain pattern
+     * Supports wildcards (*.example.com)
+     * 
+     * @param string $domain The domain to check
+     * @param string $pattern The allowed domain pattern
+     * @return bool True if domain matches pattern
+     */
+    private function matchesDomain($domain, $pattern) {
+        // Exact match
+        if ($domain === $pattern) {
+            return true;
+        }
+        
+        // Wildcard match (*.example.com)
+        if (strpos($pattern, '*') !== false) {
+            // Convert wildcard pattern to regex
+            $regex = '/^' . str_replace(['.', '*'], ['\.', '.*'], $pattern) . '$/i';
+            return preg_match($regex, $domain) === 1;
+        }
+        
+        // Subdomain match - if pattern doesn't have wildcard but domain is subdomain
+        // e.g., pattern: example.com, domain: sub.example.com
+        if (strpos($domain, '.' . $pattern) !== false) {
+            return substr($domain, -(strlen($pattern) + 1)) === '.' . $pattern;
+        }
+        
+        return false;
     }
 }

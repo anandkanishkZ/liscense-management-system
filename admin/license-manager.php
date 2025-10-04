@@ -431,325 +431,159 @@ $page_title = 'License Manager';
         </div>
     </div>
 
-    <!-- Enhanced Create/Edit License Modal -->
-    <div id="licenseModal" class="modal enhanced-modal">
-        <div class="modal-content enhanced-modal-content">
-            <div class="modal-header enhanced-modal-header">
-                <div class="modal-title-section">
-                    <div class="modal-icon">
+    <!-- Redesigned Simple Create/Edit License Modal -->
+    <div id="licenseModal" class="modal simple-modal">
+        <div class="modal-content simple-modal-content">
+            <!-- Modal Header -->
+            <div class="simple-modal-header">
+                <div class="header-left">
+                    <div class="modal-icon-badge">
                         <i class="fas fa-key"></i>
                     </div>
                     <div>
                         <h3 id="modalTitle">Create New License</h3>
-                        <p class="modal-subtitle">Generate a new software license for your customer</p>
+                        <p class="modal-subtitle">Fill in the details below to generate a new license</p>
                     </div>
                 </div>
-                <button class="modal-close enhanced-close" onclick="closeLicenseModal()" aria-label="Close modal">
+                <button class="modal-close-btn" onclick="closeLicenseModal()" aria-label="Close">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
             
-            <!-- Progress indicator for create mode -->
-            <div id="licenseProgress" class="license-progress" style="display: none;">
-                <div class="progress-steps">
-                    <div class="step active" data-step="1">
-                        <span class="step-number">1</span>
-                        <span class="step-label">Basic Info</span>
-                    </div>
-                    <div class="step" data-step="2">
-                        <span class="step-number">2</span>
-                        <span class="step-label">Configuration</span>
-                    </div>
-                    <div class="step" data-step="3">
-                        <span class="step-number">3</span>
-                        <span class="step-label">Review</span>
-                    </div>
-                </div>
-            </div>
-            
             <form id="licenseForm" onsubmit="saveLicense(event)" novalidate>
-                <div class="modal-body enhanced-modal-body">
+                <div class="simple-modal-body">
                     <input type="hidden" id="licenseId" name="license_id">
                     
                     <!-- Form validation messages -->
                     <div id="formMessages" class="form-messages" style="display: none;"></div>
                     
-                    <!-- Step 1: Basic Information -->
-                    <div class="form-step active" data-step="1">
-                        <div class="step-header">
-                            <h4><i class="fas fa-info-circle"></i> Basic Information</h4>
-                            <p>Enter the essential details for this license</p>
+                    <!-- Customer Information Section -->
+                    <div class="form-section">
+                        <div class="section-header">
+                            <i class="fas fa-user-circle"></i>
+                            <span>Customer Information</span>
                         </div>
                         
-                        <div class="form-row enhanced-form-row">
-                            <div class="form-group enhanced-form-group">
-                                <label for="productName" class="required-label">
-                                    <i class="fas fa-box"></i>
-                                    Product Name
-                                    <span class="required-asterisk">*</span>
-                                </label>
-                                <div class="input-wrapper">
-                                    <input type="text" id="productName" name="product_name" 
-                                           class="enhanced-input" 
-                                           placeholder="e.g., Premium WordPress Theme"
-                                           required aria-describedby="productName-error">
-                                    <div class="input-feedback">
-                                        <i class="fas fa-check-circle success-icon"></i>
-                                        <i class="fas fa-exclamation-circle error-icon"></i>
-                                    </div>
-                                </div>
-                                <div class="field-error" id="productName-error"></div>
-                                <div class="field-help">The name of the software or product being licensed</div>
+                        <div class="form-grid">
+                            <div class="form-field">
+                                <label for="customerName">Customer Name <span class="required">*</span></label>
+                                <input type="text" id="customerName" name="customer_name" 
+                                       placeholder="Enter customer full name"
+                                       required>
+                                <div class="field-error" id="customerName-error"></div>
                             </div>
                             
-                            <div class="form-group enhanced-form-group">
-                                <label for="customerName" class="required-label">
-                                    <i class="fas fa-user"></i>
-                                    Customer Name
-                                    <span class="required-asterisk">*</span>
-                                </label>
-                                <div class="input-wrapper">
-                                    <input type="text" id="customerName" name="customer_name" 
-                                           class="enhanced-input"
-                                           placeholder="e.g., John Smith"
-                                           required aria-describedby="customerName-error">
-                                    <div class="input-feedback">
-                                        <i class="fas fa-check-circle success-icon"></i>
-                                        <i class="fas fa-exclamation-circle error-icon"></i>
-                                    </div>
-                                </div>
-                                <div class="field-error" id="customerName-error"></div>
-                                <div class="field-help">Full name of the license holder</div>
-                            </div>
-                        </div>
-                        
-                        <div class="form-group enhanced-form-group">
-                            <label for="customerEmail" class="required-label">
-                                <i class="fas fa-envelope"></i>
-                                Customer Email
-                                <span class="required-asterisk">*</span>
-                            </label>
-                            <div class="input-wrapper">
+                            <div class="form-field">
+                                <label for="customerEmail">Email Address <span class="required">*</span></label>
                                 <input type="email" id="customerEmail" name="customer_email" 
-                                       class="enhanced-input"
                                        placeholder="customer@example.com"
-                                       required aria-describedby="customerEmail-error">
-                                <div class="input-feedback">
-                                    <i class="fas fa-check-circle success-icon"></i>
-                                    <i class="fas fa-exclamation-circle error-icon"></i>
-                                </div>
+                                       required>
+                                <div class="field-error" id="customerEmail-error"></div>
                             </div>
-                            <div class="field-error" id="customerEmail-error"></div>
-                            <div class="field-help">This email will be used for license notifications and communication</div>
                         </div>
                     </div>
                     
-                    <!-- Step 2: License Configuration -->
-                    <div class="form-step" data-step="2" style="display: none;">
-                        <div class="step-header">
-                            <h4><i class="fas fa-cogs"></i> License Configuration</h4>
-                            <p>Configure the technical aspects of this license</p>
+                    <!-- License Configuration Section -->
+                    <div class="form-section">
+                        <div class="section-header">
+                            <i class="fas fa-cog"></i>
+                            <span>License Configuration</span>
                         </div>
                         
-                        <div class="form-row enhanced-form-row">
-                            <div class="form-group enhanced-form-group">
-                                <label for="maxActivations" class="required-label">
-                                    <i class="fas fa-hashtag"></i>
-                                    Maximum Activations
-                                    <span class="required-asterisk">*</span>
-                                </label>
-                                <div class="input-wrapper number-input-wrapper">
-                                    <button type="button" class="number-btn decrease" onclick="adjustNumber('maxActivations', -1)">
+                        <div class="form-grid">
+                            <div class="form-field">
+                                <label for="productName">Product Name <span class="required">*</span></label>
+                                <input type="text" id="productName" name="product_name" 
+                                       placeholder="e.g., Premium WordPress Theme"
+                                       required>
+                                <div class="field-error" id="productName-error"></div>
+                            </div>
+                            
+                            <div class="form-field">
+                                <label for="maxActivations">Max Activations <span class="required">*</span></label>
+                                <div class="number-input-group">
+                                    <button type="button" class="num-btn" onclick="adjustNumber('maxActivations', -1)">
                                         <i class="fas fa-minus"></i>
                                     </button>
                                     <input type="number" id="maxActivations" name="max_activations" 
-                                           class="enhanced-input number-input" 
-                                           min="1" max="999" value="1" 
-                                           required aria-describedby="maxActivations-error">
-                                    <button type="button" class="number-btn increase" onclick="adjustNumber('maxActivations', 1)">
+                                           value="1" min="1" max="999" required>
+                                    <button type="button" class="num-btn" onclick="adjustNumber('maxActivations', 1)">
                                         <i class="fas fa-plus"></i>
                                     </button>
-                                    <div class="input-feedback">
-                                        <i class="fas fa-check-circle success-icon"></i>
-                                        <i class="fas fa-exclamation-circle error-icon"></i>
-                                    </div>
                                 </div>
                                 <div class="field-error" id="maxActivations-error"></div>
-                                <div class="field-help">Number of sites/domains where this license can be activated</div>
                             </div>
                             
-                            <div class="form-group enhanced-form-group">
-                                <label for="expiresAt" class="required-label">
-                                    <i class="fas fa-calendar-alt"></i>
-                                    Expiration Date
-                                    <span class="required-asterisk">*</span>
-                                </label>
-                                <div class="input-wrapper">
-                                    <input type="datetime-local" id="expiresAt" name="expires_at" 
-                                           class="enhanced-input"
-                                           required aria-describedby="expiresAt-error">
-                                    <div class="input-feedback">
-                                        <i class="fas fa-check-circle success-icon"></i>
-                                        <i class="fas fa-exclamation-circle error-icon"></i>
-                                    </div>
+                            <div class="form-field full-width">
+                                <label for="expiresAt">Expiration Date <span class="required">*</span></label>
+                                <input type="datetime-local" id="expiresAt" name="expires_at" required>
+                                <div class="quick-dates">
+                                    <button type="button" class="quick-btn" onclick="setQuickDate(30)">30 days</button>
+                                    <button type="button" class="quick-btn" onclick="setQuickDate(365)">1 year</button>
+                                    <button type="button" class="quick-btn" onclick="setQuickDate(1095)">3 years</button>
+                                    <button type="button" class="quick-btn" onclick="setQuickDate(0)">Lifetime</button>
                                 </div>
                                 <div class="field-error" id="expiresAt-error"></div>
-                                <div class="field-help">When this license will expire (leave blank for lifetime)</div>
-                                <div class="quick-dates">
-                                    <button type="button" class="quick-date-btn" onclick="setQuickDate(30)">30 days</button>
-                                    <button type="button" class="quick-date-btn" onclick="setQuickDate(365)">1 year</button>
-                                    <button type="button" class="quick-date-btn" onclick="setQuickDate(1095)">3 years</button>
-                                    <button type="button" class="quick-date-btn" onclick="setQuickDate(0)">Lifetime</button>
-                                </div>
                             </div>
-                        </div>
-                        
-                        <div class="form-group enhanced-form-group">
-                            <label for="allowedDomains">
-                                <i class="fas fa-globe"></i>
-                                Allowed Domains
-                                <span class="optional-label">(Optional)</span>
-                            </label>
-                            <div class="input-wrapper">
-                                <input type="text" id="allowedDomains" name="allowed_domains" 
-                                       class="enhanced-input"
-                                       placeholder="example.com, *.example.com, subdomain.example.com"
-                                       aria-describedby="allowedDomains-error">
-                                <div class="input-feedback">
-                                    <i class="fas fa-check-circle success-icon"></i>
-                                    <i class="fas fa-exclamation-circle error-icon"></i>
-                                </div>
-                            </div>
-                            <div class="field-error" id="allowedDomains-error"></div>
-                            <div class="field-help">Restrict license usage to specific domains. Use wildcards (*) for subdomains. Leave blank for no restrictions.</div>
-                            <div class="domain-examples">
-                                <span class="example-tag" onclick="addDomainExample('example.com')">example.com</span>
-                                <span class="example-tag" onclick="addDomainExample('*.example.com')">*.example.com</span>
-                                <span class="example-tag" onclick="addDomainExample('localhost')">localhost</span>
-                            </div>
-                        </div>
-                        
-                        <div class="form-group enhanced-form-group">
-                            <label for="features">
-                                <i class="fas fa-star"></i>
-                                Enabled Features
-                                <span class="optional-label">(Optional)</span>
-                            </label>
-                            <div class="input-wrapper">
-                                <input type="text" id="features" name="features" 
-                                       class="enhanced-input"
-                                       placeholder="premium-support, advanced-widgets, custom-css"
-                                       aria-describedby="features-error">
-                                <div class="input-feedback">
-                                    <i class="fas fa-check-circle success-icon"></i>
-                                    <i class="fas fa-exclamation-circle error-icon"></i>
-                                </div>
-                            </div>
-                            <div class="field-error" id="features-error"></div>
-                            <div class="field-help">Comma-separated list of features enabled for this license</div>
-                        </div>
-                        
-                        <div class="form-group enhanced-form-group">
-                            <label for="status">
-                                <i class="fas fa-toggle-on"></i>
-                                Initial Status
-                            </label>
-                            <div class="input-wrapper select-wrapper">
-                                <select id="status" name="status" class="enhanced-select">
-                                    <option value="active" selected>🟢 Active - License is ready to use</option>
-                                    <option value="suspended">🟡 Suspended - Temporarily disabled</option>
-                                    <option value="revoked">🔴 Revoked - Permanently disabled</option>
-                                </select>
-                                <div class="select-arrow">
-                                    <i class="fas fa-chevron-down"></i>
-                                </div>
-                            </div>
-                            <div class="field-help">The initial status of this license</div>
                         </div>
                     </div>
                     
-                    <!-- Step 3: Review & Additional Info -->
-                    <div class="form-step" data-step="3" style="display: none;">
-                        <div class="step-header">
-                            <h4><i class="fas fa-eye"></i> Review & Additional Information</h4>
-                            <p>Review your license configuration and add any additional notes</p>
+                    <!-- Advanced Options Section (Collapsible) -->
+                    <div class="form-section collapsible">
+                        <div class="section-header clickable" onclick="toggleAdvancedOptions()">
+                            <i class="fas fa-sliders-h"></i>
+                            <span>Advanced Options</span>
+                            <i class="fas fa-chevron-down toggle-icon" id="advancedToggle"></i>
                         </div>
                         
-                        <!-- License Preview -->
-                        <div class="license-preview">
-                            <h5><i class="fas fa-preview"></i> License Preview</h5>
-                            <div class="preview-card">
-                                <div class="preview-header">
-                                    <div class="preview-product"></div>
-                                    <div class="preview-status"></div>
+                        <div class="advanced-content" id="advancedOptions" style="display: none;">
+                            <div class="form-grid">
+                                <div class="form-field full-width">
+                                    <label for="allowedDomains">Allowed Domains <span class="optional">(Optional)</span></label>
+                                    <input type="text" id="allowedDomains" name="allowed_domains" 
+                                           placeholder="example.com, *.example.com">
+                                    <small class="field-hint">Comma-separated list. Use * for wildcards</small>
                                 </div>
-                                <div class="preview-details">
-                                    <div class="preview-row">
-                                        <span class="preview-label">Customer:</span>
-                                        <span class="preview-customer"></span>
-                                    </div>
-                                    <div class="preview-row">
-                                        <span class="preview-label">Email:</span>
-                                        <span class="preview-email"></span>
-                                    </div>
-                                    <div class="preview-row">
-                                        <span class="preview-label">Max Activations:</span>
-                                        <span class="preview-activations"></span>
-                                    </div>
-                                    <div class="preview-row">
-                                        <span class="preview-label">Expires:</span>
-                                        <span class="preview-expires"></span>
-                                    </div>
+                                
+                                <div class="form-field full-width">
+                                    <label for="features">Enabled Features <span class="optional">(Optional)</span></label>
+                                    <input type="text" id="features" name="features" 
+                                           placeholder="premium-support, advanced-widgets">
+                                    <small class="field-hint">Comma-separated list of features</small>
                                 </div>
-                            </div>
-                        </div>
-                        
-                        <div class="form-group enhanced-form-group">
-                            <label for="notes">
-                                <i class="fas fa-sticky-note"></i>
-                                Internal Notes
-                                <span class="optional-label">(Optional)</span>
-                            </label>
-                            <div class="input-wrapper">
-                                <textarea id="notes" name="notes" 
-                                         class="enhanced-textarea"
-                                         rows="4" 
-                                         placeholder="Add any internal notes about this license, special arrangements, or reminders..."
-                                         aria-describedby="notes-error"></textarea>
-                                <div class="textarea-counter">
-                                    <span id="notesCounter">0</span>/500 characters
+                                
+                                <div class="form-field full-width" id="statusField" style="display: none;">
+                                    <label for="status">Status</label>
+                                    <select id="status" name="status">
+                                        <option value="active">Active</option>
+                                        <option value="suspended">Suspended</option>
+                                        <option value="revoked">Revoked</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-field full-width">
+                                    <label for="notes">Internal Notes <span class="optional">(Optional)</span></label>
+                                    <textarea id="notes" name="notes" rows="3" 
+                                             placeholder="Add any internal notes..."></textarea>
+                                    <small class="field-hint">For internal use only</small>
                                 </div>
                             </div>
-                            <div class="field-error" id="notes-error"></div>
-                            <div class="field-help">These notes are for internal use only and won't be visible to the customer</div>
                         </div>
                     </div>
                 </div>
                 
-                <div class="modal-footer enhanced-modal-footer">
-                    <div class="footer-left">
-                        <button type="button" id="prevStepBtn" class="btn btn-outline" onclick="previousStep()" style="display: none;">
-                            <i class="fas fa-arrow-left"></i>
-                            Previous
-                        </button>
-                    </div>
-                    <div class="footer-right">
-                        <button type="button" class="btn btn-secondary" onclick="closeLicenseModal()">
-                            <i class="fas fa-times"></i>
-                            Cancel
-                        </button>
-                        <button type="button" id="nextStepBtn" class="btn btn-primary" onclick="nextStep()">
-                            Next
-                            <i class="fas fa-arrow-right"></i>
-                        </button>
-                        <button type="submit" id="submitBtn" class="btn btn-success" style="display: none;">
-                            <i class="fas fa-save"></i>
-                            <span class="btn-text">Create License</span>
-                            <div class="btn-loader" style="display: none;">
-                                <i class="fas fa-spinner fa-spin"></i>
-                            </div>
-                        </button>
-                    </div>
+                <!-- Modal Footer -->
+                <div class="simple-modal-footer">
+                    <button type="button" class="btn btn-cancel" onclick="closeLicenseModal()">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn btn-create" id="submitBtn">
+                        <i class="fas fa-check"></i>
+                        <span class="btn-text">Create License</span>
+                        <div class="btn-loader" style="display: none;">
+                            <i class="fas fa-spinner fa-spin"></i>
+                        </div>
+                    </button>
                 </div>
             </form>
         </div>

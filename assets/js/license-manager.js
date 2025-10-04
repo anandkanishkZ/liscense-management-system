@@ -549,7 +549,6 @@ function debounce(func, wait) {
  */
 function openCreateLicenseModal() {
     currentEditingLicense = null;
-    currentStep = 1;
     
     console.log('Opening create license modal');
     
@@ -557,7 +556,7 @@ function openCreateLicenseModal() {
     document.getElementById('modalTitle').textContent = 'Create New License';
     const modalSubtitle = document.querySelector('.modal-subtitle');
     if (modalSubtitle) {
-        modalSubtitle.textContent = 'Generate a new software license for your customer';
+        modalSubtitle.textContent = 'Fill in the details below to generate a new license';
     }
     
     // Reset form
@@ -567,31 +566,41 @@ function openCreateLicenseModal() {
     }
     document.getElementById('licenseId').value = '';
     
-    // Show progress indicator
-    const progressElement = document.getElementById('licenseProgress');
-    if (progressElement) {
-        progressElement.style.display = 'block';
-        console.log('Progress element shown');
+    // Hide status field for create mode
+    const statusField = document.getElementById('statusField');
+    if (statusField) {
+        statusField.style.display = 'none';
     }
     
-    // Hide status field for create mode
-    const statusElement = document.getElementById('status');
-    if (statusElement && statusElement.parentElement) {
-        statusElement.parentElement.style.display = 'none';
+    // Reset advanced options to collapsed state
+    const advancedOptions = document.getElementById('advancedOptions');
+    const advancedToggle = document.getElementById('advancedToggle');
+    if (advancedOptions) {
+        advancedOptions.style.display = 'none';
+    }
+    if (advancedToggle) {
+        advancedToggle.classList.remove('rotated');
     }
     
     // Clear any previous validation states
-    document.querySelectorAll('.form-step input, .form-step select, .form-step textarea').forEach(field => {
-        field.classList.remove('valid', 'invalid');
-        field.style.borderColor = '';
+    document.querySelectorAll('.form-field input, .form-field select, .form-field textarea').forEach(field => {
+        field.classList.remove('valid', 'invalid', 'error');
     });
     
-    // Reset and show first step
-    resetSteps();
-    showStep(1);
+    // Clear error messages
+    document.querySelectorAll('.field-error').forEach(errorDiv => {
+        errorDiv.textContent = '';
+    });
     
     // Set default values
     setDefaultValues();
+    
+    // Update submit button text
+    const submitBtn = document.getElementById('submitBtn');
+    const btnText = submitBtn?.querySelector('.btn-text');
+    if (btnText) {
+        btnText.textContent = 'Create License';
+    }
     
     // Show modal
     const modal = document.getElementById('licenseModal');
@@ -602,12 +611,30 @@ function openCreateLicenseModal() {
     
     // Focus first input after a short delay
     setTimeout(() => {
-        const firstInput = document.getElementById('productName');
+        const firstInput = document.getElementById('customerName');
         if (firstInput) {
             firstInput.focus();
             console.log('First input focused');
         }
     }, 200);
+}
+
+/**
+ * Toggle advanced options
+ */
+function toggleAdvancedOptions() {
+    const advancedOptions = document.getElementById('advancedOptions');
+    const toggleIcon = document.getElementById('advancedToggle');
+    
+    if (advancedOptions && toggleIcon) {
+        if (advancedOptions.style.display === 'none') {
+            advancedOptions.style.display = 'block';
+            toggleIcon.classList.add('rotated');
+        } else {
+            advancedOptions.style.display = 'none';
+            toggleIcon.classList.remove('rotated');
+        }
+    }
 }
 
 /**
@@ -689,7 +716,6 @@ async function editLicense(licenseId) {
         if (result.success) {
             const license = result.license;
             currentEditingLicense = licenseId;
-            currentStep = 1;
             
             // Set modal to edit mode
             document.getElementById('modalTitle').textContent = 'Edit License';
@@ -698,16 +724,15 @@ async function editLicense(licenseId) {
                 modalSubtitle.textContent = 'Update license information and settings';
             }
             
-            // Hide progress steps for edit mode
-            const progressElement = document.getElementById('licenseProgress');
-            if (progressElement) {
-                progressElement.style.display = 'none';
+            // Expand advanced options for edit mode
+            const advancedOptions = document.getElementById('advancedOptions');
+            const advancedToggle = document.getElementById('advancedToggle');
+            if (advancedOptions) {
+                advancedOptions.style.display = 'block';
             }
-            
-            // Show all form sections for edit mode
-            document.querySelectorAll('.form-step').forEach(step => {
-                step.style.display = 'block';
-            });
+            if (advancedToggle) {
+                advancedToggle.classList.add('rotated');
+            }
             
             // Populate form fields
             document.getElementById('licenseId').value = license.id;
@@ -722,32 +747,22 @@ async function editLicense(licenseId) {
             document.getElementById('status').value = license.status;
             
             // Show status field for editing
-            const statusElement = document.getElementById('status');
-            if (statusElement && statusElement.parentElement) {
-                statusElement.parentElement.style.display = 'block';
+            const statusField = document.getElementById('statusField');
+            if (statusField) {
+                statusField.style.display = 'block';
             }
             
-            // Update navigation for edit mode
-            const prevBtn = document.getElementById('prevStepBtn');
-            const nextBtn = document.getElementById('nextStepBtn');
+            // Update submit button
             const submitBtn = document.getElementById('submitBtn');
-            
-            if (prevBtn) prevBtn.style.display = 'none';
-            if (nextBtn) nextBtn.style.display = 'none';
-            if (submitBtn) {
-                submitBtn.style.display = 'block';
-                const btnText = submitBtn.querySelector('.btn-text');
-                if (btnText) {
-                    btnText.textContent = 'Update License';
-                }
+            const btnText = submitBtn?.querySelector('.btn-text');
+            if (btnText) {
+                btnText.textContent = 'Update License';
             }
-            
-            // Initialize validation for edit mode
-            initializeFormValidation();
             
             // Show modal
             document.getElementById('licenseModal').style.display = 'flex';
-            document.getElementById('productName').focus();
+            document.getElementById('licenseModal').classList.add('show');
+            document.getElementById('customerName').focus();
         } else {
             showNotification('Error loading license details: ' + result.message, 'error');
         }
@@ -763,33 +778,47 @@ async function editLicense(licenseId) {
 async function saveLicense(event) {
     event.preventDefault();
     
-    // Final validation before submission
-    if (!currentEditingLicense) {
-        // For create mode, validate all steps
-        const isValid = validateAllSteps();
-        if (!isValid) {
-            showFormMessage('Please fix all errors before saving.', 'error');
-            return;
-        }
-    } else {
-        // For edit mode, validate visible fields
-        const form = document.getElementById('licenseForm');
-        const inputs = form.querySelectorAll('input[required], select[required], textarea[required]');
-        let isValid = true;
-        
-        inputs.forEach(input => {
-            if (!validateField({ target: input })) {
-                isValid = false;
+    // Simple validation - check required fields
+    const form = document.getElementById('licenseForm');
+    const requiredFields = form.querySelectorAll('[required]');
+    let isValid = true;
+    
+    requiredFields.forEach(field => {
+        if (!field.value.trim()) {
+            field.classList.add('error');
+            const errorDiv = document.getElementById(field.id + '-error');
+            if (errorDiv) {
+                errorDiv.textContent = 'This field is required';
             }
-        });
-        
-        if (!isValid) {
-            showFormMessage('Please fix all errors before saving.', 'error');
-            return;
+            isValid = false;
+        } else {
+            field.classList.remove('error');
+            const errorDiv = document.getElementById(field.id + '-error');
+            if (errorDiv) {
+                errorDiv.textContent = '';
+            }
+        }
+    });
+    
+    // Validate email format
+    const emailField = document.getElementById('customerEmail');
+    if (emailField && emailField.value) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(emailField.value)) {
+            emailField.classList.add('error');
+            const errorDiv = document.getElementById('customerEmail-error');
+            if (errorDiv) {
+                errorDiv.textContent = 'Please enter a valid email address';
+            }
+            isValid = false;
         }
     }
     
-    const form = event.target;
+    if (!isValid) {
+        showFormMessage('Please fill in all required fields correctly.', 'error');
+        return;
+    }
+    
     const formData = new FormData(form);
     
     const action = currentEditingLicense ? 'update_license' : 'create_license';
@@ -844,6 +873,28 @@ async function saveLicense(event) {
                 if (btnLoader) btnLoader.style.display = 'none';
             }
         }, 1000);
+    }
+}
+
+/**
+ * Show form message
+ */
+function showFormMessage(message, type) {
+    const formMessages = document.getElementById('formMessages');
+    if (formMessages) {
+        formMessages.textContent = message;
+        formMessages.className = 'form-messages ' + type;
+        formMessages.style.display = 'flex';
+    }
+}
+
+/**
+ * Hide form message
+ */
+function hideFormMessage() {
+    const formMessages = document.getElementById('formMessages');
+    if (formMessages) {
+        formMessages.style.display = 'none';
     }
 }
 
@@ -907,10 +958,6 @@ function closeLicenseModal() {
     modal.style.display = 'none';
     modal.classList.remove('show');
     currentEditingLicense = null;
-    currentStep = 1;
-    
-    // Reset form state
-    resetSteps();
     
     // Clear form
     const form = document.getElementById('licenseForm');
@@ -918,11 +965,28 @@ function closeLicenseModal() {
         form.reset();
     }
     
-    // Hide progress for edit mode
-    const progressElement = document.getElementById('licenseProgress');
-    if (progressElement) {
-        progressElement.style.display = 'none';
+    // Reset advanced options
+    const advancedOptions = document.getElementById('advancedOptions');
+    const advancedToggle = document.getElementById('advancedToggle');
+    if (advancedOptions) {
+        advancedOptions.style.display = 'none';
     }
+    if (advancedToggle) {
+        advancedToggle.classList.remove('rotated');
+    }
+    
+    // Clear validation states
+    document.querySelectorAll('.form-field input, .form-field select, .form-field textarea').forEach(field => {
+        field.classList.remove('error', 'valid', 'invalid');
+    });
+    
+    // Clear error messages
+    document.querySelectorAll('.field-error').forEach(errorDiv => {
+        errorDiv.textContent = '';
+    });
+    
+    // Hide form messages
+    hideFormMessage();
 }
 
 /**
