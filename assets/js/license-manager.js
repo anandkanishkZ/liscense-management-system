@@ -1191,6 +1191,16 @@ function generateLicenseDetailsHTML(license) {
                 <button class="btn btn-warning" onclick="regenerateKey(${license.id})">
                     <i class="fas fa-sync"></i> Regenerate Key
                 </button>
+                ${license.status === 'active' ? `
+                <button class="btn btn-danger" onclick="suspendLicense(${license.id}); closeDetailsModal();">
+                    <i class="fas fa-pause-circle"></i> Suspend License
+                </button>
+                ` : ''}
+                ${license.status === 'suspended' ? `
+                <button class="btn btn-success" onclick="reactivateLicense(${license.id}); closeDetailsModal();">
+                    <i class="fas fa-play-circle"></i> Reactivate License
+                </button>
+                ` : ''}
             </div>
         </div>
     `;
@@ -1250,20 +1260,25 @@ async function regenerateKey(licenseId) {
  * Suspend license
  */
 async function suspendLicense(licenseId) {
+    console.log('suspendLicense called with ID:', licenseId);
+    
     if (!confirm('Are you sure you want to suspend this license?')) {
         return;
     }
     
     try {
+        console.log('Sending suspend request...');
         const response = await fetch('license-manager.php', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
             },
-            body: `action=update_license&license_id=${licenseId}&status=suspended`
+            body: `action=suspend_license&license_id=${licenseId}`
         });
         
+        console.log('Response received:', response.status);
         const result = await response.json();
+        console.log('Result:', result);
         
         if (result.success) {
             showNotification('License suspended successfully', 'success');
@@ -1274,8 +1289,46 @@ async function suspendLicense(licenseId) {
             showNotification('Error: ' + result.message, 'error');
         }
     } catch (error) {
-        console.error('Error:', error);
+        console.error('Error suspending license:', error);
         showNotification('Error suspending license', 'error');
+    }
+}
+
+/**
+ * Reactivate/Unsuspend license
+ */
+async function reactivateLicense(licenseId) {
+    console.log('reactivateLicense called with ID:', licenseId);
+    
+    if (!confirm('Are you sure you want to reactivate this license?')) {
+        return;
+    }
+    
+    try {
+        console.log('Sending reactivate request...');
+        const response = await fetch('license-manager.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `action=reactivate_license&license_id=${licenseId}`
+        });
+        
+        console.log('Response received:', response.status);
+        const result = await response.json();
+        console.log('Result:', result);
+        
+        if (result.success) {
+            showNotification('License reactivated successfully', 'success');
+            setTimeout(() => {
+                location.reload();
+            }, 1000);
+        } else {
+            showNotification('Error: ' + result.message, 'error');
+        }
+    } catch (error) {
+        console.error('Error reactivating license:', error);
+        showNotification('Error reactivating license', 'error');
     }
 }
 
@@ -1373,7 +1426,36 @@ function toggleDropdown(button) {
     });
     
     menu.classList.toggle('show');
+    
+    // Prevent dropdown from closing when clicking inside
+    if (!menu.hasAttribute('data-click-handler')) {
+        menu.setAttribute('data-click-handler', 'true');
+        menu.addEventListener('click', function(e) {
+            // Don't stop propagation for links that trigger actions
+            if (e.target.tagName === 'A' || e.target.closest('a')) {
+                // Let the action run but close dropdown after a delay
+                setTimeout(() => {
+                    menu.classList.remove('show');
+                }, 100);
+            }
+        });
+    }
 }
+
+// Close dropdowns when clicking outside (ignore top bar menus)
+document.addEventListener('click', function(e) {
+    const isActionDropdown = e.target.closest('.dropdown');
+    const isTopBarArea = e.target.closest('.notification-bell')
+        || e.target.closest('#notificationsDropdown')
+        || e.target.closest('.user-dropdown')
+        || e.target.closest('.user-info');
+
+    if (!isActionDropdown && !isTopBarArea) {
+        document.querySelectorAll('.dropdown-menu.show').forEach(menu => {
+            menu.classList.remove('show');
+        });
+    }
+});
 
 /**
  * Show expiring licenses
@@ -1423,11 +1505,27 @@ function showNotification(message, type = 'info') {
     }, 5000);
 }
 
-// Close dropdowns when clicking outside
-document.addEventListener('click', function(event) {
-    if (!event.target.closest('.dropdown')) {
-        document.querySelectorAll('.dropdown-menu.show').forEach(menu => {
-            menu.classList.remove('show');
-        });
-    }
+// Explicitly expose functions to global scope (for inline onclick handlers)
+window.suspendLicense = suspendLicense;
+window.reactivateLicense = reactivateLicense;
+window.revokeLicense = revokeLicense;
+window.editLicense = editLicense;
+window.viewLicenseDetails = viewLicenseDetails;
+window.extendLicense = extendLicense;
+window.regenerateKey = regenerateKey;
+window.saveLicense = saveLicense;
+window.openCreateLicenseModal = openCreateLicenseModal;
+window.closeLicenseModal = closeLicenseModal;
+window.closeExtendModal = closeExtendModal;
+window.closeDetailsModal = closeDetailsModal;
+window.toggleDropdown = toggleDropdown;
+window.copyLicenseKey = copyLicenseKey;
+window.applyFilters = applyFilters;
+window.handleSearchKeyup = handleSearchKeyup;
+
+console.log('License Manager JavaScript loaded successfully');
+console.log('Functions exposed:', {
+    suspendLicense: typeof window.suspendLicense,
+    reactivateLicense: typeof window.reactivateLicense,
+    revokeLicense: typeof window.revokeLicense
 });

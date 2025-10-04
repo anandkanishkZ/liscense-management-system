@@ -187,4 +187,32 @@ class LMSLogger {
         
         return $stmt->execute();
     }
+
+    public function getLogCount($level = null) {
+        if (!$this->db) {
+            return 0;
+        }
+
+        try {
+            $sql = "SELECT COUNT(*) as total FROM " . LMS_TABLE_LOGS;
+            $params = [];
+
+            if ($level) {
+                $sql .= " WHERE level = :level";
+                $params['level'] = strtoupper($level);
+            }
+
+            $stmt = $this->db->prepare($sql);
+            foreach ($params as $key => $value) {
+                $stmt->bindValue(':' . $key, $value);
+            }
+
+            $stmt->execute();
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            return (int)($result['total'] ?? 0);
+        } catch (Exception $e) {
+            $this->logToFile('ERROR', 'Failed to count logs: ' . $e->getMessage());
+            return 0;
+        }
+    }
 }

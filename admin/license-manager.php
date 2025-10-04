@@ -18,12 +18,17 @@ if (!$auth->isAuthenticated()) {
     exit;
 }
 
+$current_user = $auth->getCurrentUser();
 $license_manager = new LMSLicenseManager();
 $logger = new LMSLogger();
+$stats = $license_manager->getStatistics();
 
 // Handle AJAX requests
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     header('Content-Type: application/json');
+    
+    // Log incoming request for debugging
+    error_log("License Manager POST Request - Action: " . $_POST['action'] . " - License ID: " . ($_POST['license_id'] ?? 'N/A'));
     
     try {
         switch ($_POST['action']) {
@@ -59,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     'status' => $_POST['status'] ?? 'active'
                 ];
                 
-                $license_manager->updateLicense($license_id, $data);
+                $license_manager->updateLicenseById($license_id, $data);
                 $logger->log('license_updated', "License updated: $license_id", $auth->getCurrentUser()['id']);
                 
                 echo json_encode(['success' => true, 'message' => 'License updated successfully']);
@@ -102,6 +107,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 } else {
                     echo json_encode(['success' => false, 'message' => 'License not found']);
                 }
+                exit;
+                
+            case 'update_status':
+                $license_id = (int)$_POST['license_id'];
+                $status = $_POST['status'] ?? '';
+                
+                if (empty($status)) {
+                    throw new Exception('Status is required');
+                }
+                
+                if (!in_array($status, ['active', 'suspended', 'expired', 'revoked'])) {
+                    throw new Exception('Invalid status value');
+                }
+                
+                $data = ['status' => $status];
+                $license_manager->updateLicenseById($license_id, $data);
+                $logger->log('license_status_updated', "License status updated: $license_id to $status", $auth->getCurrentUser()['id']);
+                
+                echo json_encode(['success' => true, 'message' => 'License status updated successfully']);
+                exit;
+                
+            case 'suspend_license':
+                $license_id = (int)$_POST['license_id'];
+                
+                $data = ['status' => 'suspended'];
+                $license_manager->updateLicenseById($license_id, $data);
+                $logger->log('license_suspended', "License suspended: $license_id", $auth->getCurrentUser()['id']);
+                
+                echo json_encode(['success' => true, 'message' => 'License suspended successfully']);
+                exit;
+                
+            case 'unsuspend_license':
+            case 'reactivate_license':
+                $license_id = (int)$_POST['license_id'];
+                
+                $data = ['status' => 'active'];
+                $license_manager->updateLicenseById($license_id, $data);
+                $logger->log('license_reactivated', "License reactivated: $license_id", $auth->getCurrentUser()['id']);
+                
+                echo json_encode(['success' => true, 'message' => 'License reactivated successfully']);
                 exit;
                 
             default:
@@ -371,20 +416,30 @@ $page_title = 'License Manager';
                                                             <i class="fas fa-ellipsis-v"></i>
                                                         </button>
                                                         <div class="dropdown-menu">
-                                                            <a href="#" onclick="extendLicense(<?php echo $license['id']; ?>)">
+                                                            <a href="#" onclick="extendLicense(<?php echo $license['id']; ?>); return false;">
                                                                 <i class="fas fa-calendar-plus"></i> Extend License
                                                             </a>
-                                                            <a href="#" onclick="regenerateKey(<?php echo $license['id']; ?>)">
+                                                            <a href="#" onclick="regenerateKey(<?php echo $license['id']; ?>); return false;">
                                                                 <i class="fas fa-sync"></i> Regenerate Key
                                                             </a>
-                                                            <?php if ($license['status'] === 'active'): ?>
-                                                            <a href="#" onclick="suspendLicense(<?php echo $license['id']; ?>)">
+                                                            <?php 
+                                                            // Debug: Show current status
+                                                            $current_status = $license['status'];
+                                                            ?>
+                                                            <?php if ($current_status === 'active'): ?>
+                                                            <a href="#" onclick="event.preventDefault(); suspendLicense(<?php echo $license['id']; ?>); return false;">
                                                                 <i class="fas fa-pause"></i> Suspend
                                                             </a>
+                                                            <?php elseif ($current_status === 'suspended'): ?>
+                                                            <a href="#" onclick="event.preventDefault(); reactivateLicense(<?php echo $license['id']; ?>); return false;">
+                                                                <i class="fas fa-check-circle"></i> Reactivate
+                                                            </a>
                                                             <?php endif; ?>
-                                                            <a href="#" onclick="revokeLicense(<?php echo $license['id']; ?>)" class="text-danger">
+                                                            <?php if ($current_status !== 'revoked'): ?>
+                                                            <a href="#" onclick="event.preventDefault(); revokeLicense(<?php echo $license['id']; ?>); return false;" class="text-danger">
                                                                 <i class="fas fa-ban"></i> Revoke
                                                             </a>
+                                                            <?php endif; ?>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -649,6 +704,6 @@ $page_title = 'License Manager';
         </div>
     </div>
 
-    <script src="../assets/js/license-manager.js"></script>
+    <script src="../assets/js/license-manager.js?v=<?php echo time(); ?>"></script>
 </body>
 </html>
