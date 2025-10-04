@@ -2,6 +2,27 @@
 
 A professional PHP-based license management system for software products and themes. This system provides secure license validation, domain-based restrictions, and comprehensive admin management.
 
+## 🎉 New: Interactive Installation Wizard!
+
+**First-time users** will automatically see a beautiful, step-by-step installation wizard when they open the application!
+
+### ✨ Installation is now as easy as 1-2-3:
+
+1. **Upload files** to your server
+2. **Create a MySQL database**
+3. **Open your website** → Wizard starts automatically!
+
+No more manual configuration! The wizard will:
+- ✅ Check system requirements
+- 🗄️ Configure database connection
+- 📊 Import database structure
+- 👤 Create your admin account
+- 🚀 Get you started in minutes!
+
+[See Installation Wizard Documentation](INSTALLATION_WIZARD_README.md)
+
+---
+
 ## ✨ Features
 
 - **🔑 License Management**: Create, validate, activate, and deactivate licenses

@@ -1,156 +1,37 @@
 <?php
 /**
- * Zwicky Technology License Management System
- * Admin Login Page
+ * Zwicky License Manager - Admin Login
+ * Simple, Clean, Professional
  * 
- * @author Zwicky Technology
- * @version 1.0.0
+ * @version 2.0.0
  * @since 2024
  */
 
-// Enable error reporting for debugging (disable in production)
-@ini_set('display_errors', 1);
-@ini_set('display_startup_errors', 1);
-@error_reporting(E_ALL);
+require_once '../config/config.php';
 
-// Start output buffering to prevent header issues
-ob_start();
-
-// Basic diagnostic (comment out in production)
-// echo "<!-- Login page loading... -->";
-
-// Try to include config file - handle missing gracefully
-$configPaths = [
-    '../config/config.php',
-    dirname(__DIR__) . '/config/config.php',
-    '../config.php'
-];
-
-$configLoaded = false;
-foreach ($configPaths as $configPath) {
-    if (file_exists($configPath)) {
-        require_once $configPath;
-        $configLoaded = true;
-        break;
-    }
-}
-
-// If config not found, define basic constants
-if (!$configLoaded) {
-    if (!defined('LMS_SECURE')) define('LMS_SECURE', true);
-    if (!defined('LMS_VERSION')) define('LMS_VERSION', '1.0.0');
-    
-    // Include database config
-    $dbConfigPaths = [
-        '../config/database.php',
-        dirname(__DIR__) . '/config/database.php'
-    ];
-    
-    $dbConfigLoaded = false;
-    foreach ($dbConfigPaths as $dbPath) {
-        if (file_exists($dbPath)) {
-            require_once $dbPath;
-            $dbConfigLoaded = true;
-            break;
-        }
-    }
-    
-    // If database config not found, try to load .env file directly
-    if (!$dbConfigLoaded) {
-        $envPaths = [
-            '../.env',
-            dirname(__DIR__) . '/.env',
-            $_SERVER['DOCUMENT_ROOT'] . '/.env'
-        ];
-        
-        foreach($envPaths as $envPath) {
-            if (file_exists($envPath) && is_readable($envPath)) {
-                try {
-                    $envContent = file_get_contents($envPath);
-                    if ($envContent !== false) {
-                        $lines = explode("\n", $envContent);
-                        foreach($lines as $line) {
-                            $line = trim($line);
-                            if (!empty($line) && strpos($line, '=') !== false && substr($line, 0, 1) !== '#') {
-                                $parts = explode('=', $line, 2);
-                                if (count($parts) === 2) {
-                                    $key = trim($parts[0]);
-                                    $value = trim($parts[1], '"\'');
-                                    if (!defined($key) && !empty($key)) {
-                                        define($key, $value);
-                                    }
-                                }
-                            }
-                        }
-                        break;
-                    }
-                } catch (Exception $e) {
-                    // Silently continue if .env loading fails
-                    continue;
-                }
-            }
-        }
-    }
-}
-
-// Ensure basic database constants are defined
-if (!defined('LMS_DB_HOST')) define('LMS_DB_HOST', 'localhost');
-if (!defined('LMS_DB_NAME')) define('LMS_DB_NAME', 'license_system');
-if (!defined('LMS_DB_USER')) define('LMS_DB_USER', 'root');
-if (!defined('LMS_DB_PASS')) define('LMS_DB_PASS', '');
-if (!defined('LMS_TABLE_ADMIN_USERS')) define('LMS_TABLE_ADMIN_USERS', 'zwicky_admin_users');
-
-// Try to include the auth class
-$authClassPaths = [
-    '../classes/LMSAdminAuth.php',
-    dirname(__DIR__) . '/classes/LMSAdminAuth.php'
-];
-
-$authClassLoaded = false;
-foreach ($authClassPaths as $authPath) {
-    if (file_exists($authPath)) {
-        require_once $authPath;
-        $authClassLoaded = true;
-        break;
-    }
-}
-
-// Initialize auth if class is available
-if ($authClassLoaded && class_exists('LMSAdminAuth')) {
-    $auth = new LMSAdminAuth();
-} else {
-    // Create a simple fallback auth system
-    $auth = null;
-}
-
-// Redirect if already logged in (only if auth class is working)
-if ($authClassLoaded && $auth && method_exists($auth, 'isAuthenticated') && $auth->isAuthenticated()) {
-    header('Location: dashboard.php');
-    exit;
-}
-
-// Also check session-based authentication
-if (session_status() !== PHP_SESSION_ACTIVE) {
+// Redirect if already logged in
+if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+
 if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true) {
     header('Location: dashboard.php');
     exit;
 }
 
 $error_message = '';
-$success_message = '';
 
+// Handle login
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
     $remember = isset($_POST['remember']);
     
     if (empty($username) || empty($password)) {
-        $error_message = 'Username and password are required';
+        $error_message = 'Please enter both username and password';
     } else {
-        if ($authClassLoaded && $auth && method_exists($auth, 'login')) {
-            // Use the proper auth class
+        try {
+            $auth = new LMSAdminAuth();
             $result = $auth->login($username, $password, $remember);
             
             if ($result['success']) {
@@ -159,47 +40,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $error_message = $result['message'];
             }
-        } else {
-            // Fallback authentication using direct database connection
-            try {
-                // Get database connection
-                if (function_exists('getLMSDatabase')) {
-                    $db = getLMSDatabase();
-                } else {
-                    // Create database connection directly
-                    $dsn = "mysql:host=" . (defined('LMS_DB_HOST') ? LMS_DB_HOST : 'localhost') . 
-                           ";dbname=" . (defined('LMS_DB_NAME') ? LMS_DB_NAME : 'license_system') . 
-                           ";charset=utf8mb4";
-                    $db = new PDO($dsn, 
-                        defined('LMS_DB_USER') ? LMS_DB_USER : 'root', 
-                        defined('LMS_DB_PASS') ? LMS_DB_PASS : '', 
-                        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
-                    );
-                }
-                
-                // Check user credentials
-                $table = defined('LMS_TABLE_ADMIN_USERS') ? LMS_TABLE_ADMIN_USERS : 'zwicky_admin_users';
-                $stmt = $db->prepare("SELECT id, username, password_hash, status FROM $table WHERE username = ? AND status = 'active'");
-                $stmt->execute([$username]);
-                $user = $stmt->fetch();
-                
-                if ($user && password_verify($password, $user['password_hash'])) {
-                    // Start session and set authentication
-                    if (session_status() !== PHP_SESSION_ACTIVE) {
-                        session_start();
-                    }
-                    $_SESSION['admin_logged_in'] = true;
-                    $_SESSION['admin_user_id'] = $user['id'];
-                    $_SESSION['admin_username'] = $user['username'];
-                    
-                    header('Location: dashboard.php');
-                    exit;
-                } else {
-                    $error_message = 'Invalid username or password';
-                }
-            } catch (Exception $e) {
-                $error_message = 'Authentication system error. Please check your database configuration.';
-            }
+        } catch (Exception $e) {
+            $error_message = 'Authentication error. Please try again.';
         }
     }
 }
@@ -209,243 +51,409 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zwicky License Manager - Admin Login</title>
-    <link rel="stylesheet" href="../assets/css/admin.css">
+    <title>Admin Login - Zwicky License Manager</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .login-container {
+            width: 100%;
+            max-width: 420px;
+        }
+        
+        .login-box {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+        
+        .login-header {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            padding: 40px 30px;
+            text-align: center;
+            color: white;
+        }
+        
+        .logo-icon {
+            width: 60px;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 16px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .logo-icon i {
+            font-size: 28px;
+        }
+        
+        .login-header h1 {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        
+        .login-header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .login-content {
+            padding: 40px 30px;
+        }
+        
+        .form-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1a202c;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+        
+        .alert {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+        }
+        
+        .alert-error {
+            background: #fee;
+            color: #c53030;
+            border: 1px solid #fc8181;
+        }
+        
+        .alert i {
+            font-size: 16px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: #4a5568;
+            margin-bottom: 8px;
+        }
+        
+        .input-wrapper {
+            position: relative;
+        }
+        
+        .input-wrapper i {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #a0aec0;
+            font-size: 16px;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 14px 16px 14px 48px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 15px;
+            font-family: inherit;
+            transition: all 0.2s;
+            background: #f7fafc;
+        }
+        
+        .form-control:focus {
+            outline: none;
+            border-color: #2563eb;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+        
+        .password-wrapper {
+            position: relative;
+        }
+        
+        .password-toggle {
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #a0aec0;
+            cursor: pointer;
+            padding: 8px;
+            transition: color 0.2s;
+        }
+        
+        .password-toggle:hover {
+            color: #2563eb;
+        }
+        
+        .form-options {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            font-size: 14px;
+        }
+        
+        .remember-me {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            color: #4a5568;
+        }
+        
+        .remember-me input {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        
+        .forgot-password {
+            color: #2563eb;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+        
+        .forgot-password:hover {
+            color: #1d4ed8;
+        }
+        
+        .btn-login {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .btn-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4);
+        }
+        
+        .btn-login:active {
+            transform: translateY(0);
+        }
+        
+        .btn-login.loading {
+            opacity: 0.8;
+            cursor: not-allowed;
+        }
+        
+        .login-footer {
+            padding: 24px 30px;
+            background: #f7fafc;
+            border-top: 1px solid #e2e8f0;
+            text-align: center;
+        }
+        
+        .security-info {
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        
+        .security-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: #718096;
+        }
+        
+        .security-badge i {
+            color: #2563eb;
+            font-size: 14px;
+        }
+        
+        .copyright {
+            font-size: 13px;
+            color: #a0aec0;
+            margin-top: 8px;
+        }
+        
+        @media (max-width: 480px) {
+            .login-content {
+                padding: 30px 20px;
+            }
+            
+            .login-header {
+                padding: 30px 20px;
+            }
+            
+            .security-info {
+                flex-direction: column;
+                gap: 12px;
+            }
+        }
+    </style>
 </head>
-<body class="login-page">
-    <!-- Background Elements -->
-    <div class="bg-shapes">
-        <div class="shape shape-1"></div>
-        <div class="shape shape-2"></div>
-        <div class="shape shape-3"></div>
-    </div>
-    
+<body>
     <div class="login-container">
         <div class="login-box">
+            <!-- Header -->
             <div class="login-header">
-                <div class="logo-container">
-                    <div class="logo-icon">
-                        <i class="fas fa-shield-halved"></i>
-                    </div>
-                    <div class="logo-text">
-                        <h1>Zwicky License Manager</h1>
-                        <p>Secure License Management System</p>
-                    </div>
+                <div class="logo-icon">
+                    <i class="fas fa-shield-halved"></i>
                 </div>
+                <h1>Zwicky License Manager</h1>
+                <p>Admin Portal</p>
             </div>
             
+            <!-- Content -->
             <div class="login-content">
-                <div class="welcome-text">
-                    <h2>Welcome Back</h2>
-                    <p>Please sign in to your admin account</p>
-                </div>
+                <h2 class="form-title">Sign In</h2>
                 
-                <form method="POST" class="login-form">
-                    <?php if ($error_message): ?>
-                        <div class="alert alert-error">
-                            <i class="fas fa-exclamation-triangle"></i>
-                            <span><?php echo htmlspecialchars($error_message); ?></span>
-                        </div>
-                    <?php endif; ?>
-                    
-                    <?php if ($success_message): ?>
-                        <div class="alert alert-success">
-                            <i class="fas fa-check-circle"></i>
-                            <span><?php echo htmlspecialchars($success_message); ?></span>
-                        </div>
-                    <?php endif; ?>
-                    
+                <?php if ($error_message): ?>
+                <div class="alert alert-error">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <span><?php echo htmlspecialchars($error_message); ?></span>
+                </div>
+                <?php endif; ?>
+                
+                <form method="POST" id="loginForm">
                     <div class="form-group">
+                        <label for="username">Username</label>
                         <div class="input-wrapper">
-                            <i class="fas fa-user input-icon"></i>
-                            <input type="text" id="username" name="username" 
-                                   placeholder="Enter your username"
-                                   value="<?php echo htmlspecialchars($_POST['username'] ?? ''); ?>" 
-                                   required autocomplete="username">
-                            <label for="username">Username</label>
+                            <i class="fas fa-user"></i>
+                            <input type="text" 
+                                   id="username" 
+                                   name="username" 
+                                   class="form-control"
+                                   placeholder="Enter your username" 
+                                   value="<?php echo htmlspecialchars($_POST['username'] ?? ''); ?>"
+                                   required 
+                                   autofocus>
                         </div>
                     </div>
                     
                     <div class="form-group">
-                        <div class="input-wrapper">
-                            <i class="fas fa-lock input-icon"></i>
-                            <input type="password" id="password" name="password" 
-                                   placeholder="Enter your password"
-                                   required autocomplete="current-password">
-                            <label for="password">Password</label>
+                        <label for="password">Password</label>
+                        <div class="input-wrapper password-wrapper">
+                            <i class="fas fa-lock"></i>
+                            <input type="password" 
+                                   id="password" 
+                                   name="password" 
+                                   class="form-control"
+                                   placeholder="Enter your password" 
+                                   required>
                             <button type="button" class="password-toggle" onclick="togglePassword()">
-                                <i class="fas fa-eye" id="password-eye"></i>
+                                <i class="fas fa-eye" id="toggleIcon"></i>
                             </button>
                         </div>
                     </div>
                     
                     <div class="form-options">
-                        <label class="remember-checkbox">
+                        <label class="remember-me">
                             <input type="checkbox" name="remember" id="remember">
-                            <span class="checkmark"></span>
-                            <span class="checkbox-text">Remember me for 30 days</span>
+                            <span>Remember me</span>
                         </label>
-                        
                         <a href="#" class="forgot-password">Forgot Password?</a>
                     </div>
                     
-                    <button type="submit" class="btn btn-login">
-                        <span class="btn-text">
-                            <i class="fas fa-sign-in-alt"></i>
-                            Sign In to Dashboard
-                        </span>
-                        <div class="btn-loader">
-                            <i class="fas fa-spinner fa-spin"></i>
-                        </div>
+                    <button type="submit" class="btn-login" id="loginBtn">
+                        <i class="fas fa-sign-in-alt"></i>
+                        <span>Sign In</span>
                     </button>
                 </form>
-                
-                <div class="login-divider">
-                    <span>or</span>
-                </div>
-                
-                <div class="quick-access">
-                    <button type="button" class="btn btn-secondary-outline">
-                        <i class="fas fa-fingerprint"></i>
-                        Use Biometric Login
-                    </button>
-                </div>
             </div>
             
+            <!-- Footer -->
             <div class="login-footer">
-                <div class="security-badges">
+                <div class="security-info">
                     <div class="security-badge">
-                        <i class="fas fa-shield-halved"></i>
+                        <i class="fas fa-shield-alt"></i>
                         <span>SSL Secured</span>
                     </div>
                     <div class="security-badge">
                         <i class="fas fa-lock"></i>
-                        <span>256-bit Encryption</span>
+                        <span>Encrypted</span>
                     </div>
                     <div class="security-badge">
-                        <i class="fas fa-clock"></i>
-                        <span>Auto Logout</span>
+                        <i class="fas fa-check-circle"></i>
+                        <span>Protected</span>
                     </div>
                 </div>
-                
-                <div class="system-info">
-                    <p>Zwicky License Manager v<?php echo LMS_VERSION; ?></p>
-                    <p>© <?php echo date('Y'); ?> Zwicky Technology. All rights reserved.</p>
+                <div class="copyright">
+                    © <?php echo date('Y'); ?> Zwicky Technology • v<?php echo LMS_VERSION; ?>
                 </div>
             </div>
         </div>
     </div>
-    
+
     <script>
+        // Toggle password visibility
         function togglePassword() {
-            const passwordField = document.getElementById('password');
-            const passwordEye = document.getElementById('password-eye');
+            const password = document.getElementById('password');
+            const icon = document.getElementById('toggleIcon');
             
-            if (passwordField.type === 'password') {
-                passwordField.type = 'text';
-                passwordEye.className = 'fas fa-eye-slash';
+            if (password.type === 'password') {
+                password.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
             } else {
-                passwordField.type = 'password';
-                passwordEye.className = 'fas fa-eye';
+                password.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
             }
         }
         
-        // Enhanced form interactions
-        document.addEventListener('DOMContentLoaded', function() {
-            const inputs = document.querySelectorAll('input[type="text"], input[type="password"]');
-            const loginBtn = document.querySelector('.btn-login');
-            const form = document.querySelector('.login-form');
-            
-            // Auto-focus on username field
-            document.getElementById('username').focus();
-            
-            // Handle input focus/blur for floating labels
-            inputs.forEach(input => {
-                // Check if input has value on load
-                if (input.value.trim() !== '') {
-                    input.classList.add('has-value');
-                }
-                
-                input.addEventListener('focus', function() {
-                    this.parentElement.classList.add('focused');
-                });
-                
-                input.addEventListener('blur', function() {
-                    this.parentElement.classList.remove('focused');
-                    if (this.value.trim() !== '') {
-                        this.classList.add('has-value');
-                    } else {
-                        this.classList.remove('has-value');
-                    }
-                });
-                
-                input.addEventListener('input', function() {
-                    if (this.value.trim() !== '') {
-                        this.classList.add('has-value');
-                    } else {
-                        this.classList.remove('has-value');
-                    }
-                });
-            });
-            
-            // Enhanced form submission with loading state
-            form.addEventListener('submit', function(e) {
-                loginBtn.classList.add('loading');
-                loginBtn.disabled = true;
-                
-                // Re-enable button after 5 seconds as fallback
-                setTimeout(() => {
-                    loginBtn.classList.remove('loading');
-                    loginBtn.disabled = false;
-                }, 5000);
-            });
-            
-            // Keyboard shortcuts
-            document.addEventListener('keydown', function(e) {
-                // Ctrl+Enter to submit form
-                if (e.ctrlKey && e.key === 'Enter') {
-                    if (form.checkValidity()) {
-                        form.submit();
-                    }
-                }
-                
-                // Escape to clear form
-                if (e.key === 'Escape') {
-                    form.reset();
-                    inputs.forEach(input => {
-                        input.classList.remove('has-value');
-                        input.parentElement.classList.remove('focused');
-                    });
-                    document.getElementById('username').focus();
-                }
-            });
-            
-            // Animate shapes
-            const shapes = document.querySelectorAll('.shape');
-            shapes.forEach((shape, index) => {
-                shape.style.animationDelay = `${index * 0.5}s`;
-            });
+        // Form submission loading state
+        document.getElementById('loginForm').addEventListener('submit', function() {
+            const btn = document.getElementById('loginBtn');
+            btn.classList.add('loading');
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Signing in...</span>';
         });
         
-        // Security: Clear sensitive data
+        // Clear password on page unload (security)
         window.addEventListener('beforeunload', function() {
             document.getElementById('password').value = '';
         });
         
-        // Add some interactive effects
-        document.addEventListener('mousemove', function(e) {
-            const shapes = document.querySelectorAll('.shape');
-            const mouseX = e.clientX / window.innerWidth;
-            const mouseY = e.clientY / window.innerHeight;
-            
-            shapes.forEach((shape, index) => {
-                const speed = (index + 1) * 0.02;
-                const x = (mouseX - 0.5) * 20 * speed;
-                const y = (mouseY - 0.5) * 20 * speed;
-                shape.style.transform = `translate(${x}px, ${y}px) rotate(${x}deg)`;
-            });
+        // Enter key submit
+        document.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                document.getElementById('loginForm').submit();
+            }
         });
     </script>
 </body>

@@ -150,7 +150,85 @@ CREATE TABLE IF NOT EXISTS `zwicky_logs` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='System activity and audit log table';
 
 -- ================================================
--- TABLE 5: DATABASE VERSION TRACKING
+-- TABLE 5: SYSTEM SETTINGS
+-- Application configuration and preferences
+-- ================================================
+
+CREATE TABLE IF NOT EXISTS `zwicky_settings` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `setting_key` VARCHAR(100) UNIQUE NOT NULL COMMENT 'Unique setting identifier',
+    `setting_value` TEXT COMMENT 'Setting value (can be string, number, or JSON)',
+    `setting_type` ENUM('text', 'number', 'boolean', 'json', 'email', 'url') DEFAULT 'text' COMMENT 'Data type of the setting',
+    `setting_group` VARCHAR(50) NOT NULL COMMENT 'Group/category (system, email, license, notification, security)',
+    `setting_label` VARCHAR(100) COMMENT 'Human-readable label',
+    `setting_description` TEXT COMMENT 'Description of what this setting controls',
+    `is_editable` TINYINT(1) DEFAULT 1 COMMENT 'Whether setting can be edited via UI',
+    `is_sensitive` TINYINT(1) DEFAULT 0 COMMENT 'Whether setting contains sensitive data',
+    `default_value` TEXT COMMENT 'Default value for this setting',
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT 'Setting creation timestamp',
+    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Last update timestamp',
+    
+    -- Performance indexes
+    INDEX `idx_setting_key` (`setting_key`),
+    INDEX `idx_setting_group` (`setting_group`),
+    INDEX `idx_setting_type` (`setting_type`),
+    INDEX `idx_is_editable` (`is_editable`),
+    
+    -- Composite indexes for common queries
+    INDEX `idx_group_key` (`setting_group`, `setting_key`)
+    
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='System configuration and settings table';
+
+-- ================================================
+-- DEFAULT SETTINGS INSERTION
+-- Initialize system with default configuration values
+-- ================================================
+
+INSERT IGNORE INTO `zwicky_settings` (`setting_key`, `setting_value`, `setting_type`, `setting_group`, `setting_label`, `setting_description`, `is_editable`, `is_sensitive`, `default_value`) VALUES
+
+-- SYSTEM SETTINGS
+('site_name', 'Zwicky License Manager', 'text', 'system', 'Site Name', 'The name of your license management system', 1, 0, 'Zwicky License Manager'),
+('site_url', 'http://localhost/license-management-system', 'url', 'system', 'Site URL', 'The base URL of your application', 1, 0, 'http://localhost/license-management-system'),
+('timezone', 'America/New_York', 'text', 'system', 'Timezone', 'Default timezone for the system', 1, 0, 'America/New_York'),
+('date_format', 'Y-m-d H:i:s', 'text', 'system', 'Date Format', 'PHP date format for displaying dates', 1, 0, 'Y-m-d H:i:s'),
+('records_per_page', '25', 'number', 'system', 'Records Per Page', 'Number of records to display per page in listings', 1, 0, '25'),
+('maintenance_mode', '0', 'boolean', 'system', 'Maintenance Mode', 'Enable maintenance mode (disable public access)', 1, 0, '0'),
+('debug_mode', '0', 'boolean', 'system', 'Debug Mode', 'Enable debug mode for troubleshooting', 1, 0, '0'),
+
+-- EMAIL SETTINGS
+('smtp_host', 'smtp.gmail.com', 'text', 'email', 'SMTP Host', 'SMTP server hostname', 1, 0, 'smtp.gmail.com'),
+('smtp_port', '587', 'number', 'email', 'SMTP Port', 'SMTP server port (typically 587 for TLS, 465 for SSL)', 1, 0, '587'),
+('smtp_username', '', 'email', 'email', 'SMTP Username', 'SMTP authentication username', 1, 1, ''),
+('smtp_password', '', 'text', 'email', 'SMTP Password', 'SMTP authentication password (encrypted)', 1, 1, ''),
+('smtp_encryption', 'tls', 'text', 'email', 'SMTP Encryption', 'Encryption type (tls, ssl, or none)', 1, 0, 'tls'),
+('from_email', 'noreply@zwickytech.com', 'email', 'email', 'From Email', 'Default sender email address', 1, 0, 'noreply@zwickytech.com'),
+('from_name', 'Zwicky License Manager', 'text', 'email', 'From Name', 'Default sender name', 1, 0, 'Zwicky License Manager'),
+
+-- LICENSE SETTINGS
+('license_key_format', 'ZWICKY-XXXX-XXXX-XXXX-XXXX', 'text', 'license', 'License Key Format', 'Format template for generating license keys', 1, 0, 'ZWICKY-XXXX-XXXX-XXXX-XXXX'),
+('default_max_activations', '1', 'number', 'license', 'Default Max Activations', 'Default maximum number of activations per license', 1, 0, '1'),
+('default_license_duration', '365', 'number', 'license', 'Default License Duration (days)', 'Default license validity period in days', 1, 0, '365'),
+('allow_domain_wildcard', '1', 'boolean', 'license', 'Allow Domain Wildcards', 'Allow wildcard domains (e.g., *.example.com)', 1, 0, '1'),
+('strict_domain_check', '1', 'boolean', 'license', 'Strict Domain Check', 'Enforce strict domain matching', 1, 0, '1'),
+
+-- NOTIFICATION SETTINGS
+('enable_email_notifications', '1', 'boolean', 'notification', 'Enable Email Notifications', 'Send email notifications for events', 1, 0, '1'),
+('notify_license_created', '1', 'boolean', 'notification', 'Notify on License Creation', 'Send notification when new license is created', 1, 0, '1'),
+('notify_license_activated', '1', 'boolean', 'notification', 'Notify on License Activation', 'Send notification when license is activated', 1, 0, '1'),
+('notify_license_expired', '1', 'boolean', 'notification', 'Notify on License Expiration', 'Send notification when license expires', 1, 0, '1'),
+('expiration_warning_days', '7', 'number', 'notification', 'Expiration Warning (days)', 'Days before expiration to send warning email', 1, 0, '7'),
+
+-- SECURITY SETTINGS
+('session_lifetime', '7200', 'number', 'security', 'Session Lifetime (seconds)', 'Admin session timeout in seconds (2 hours default)', 1, 0, '7200'),
+('max_login_attempts', '5', 'number', 'security', 'Max Login Attempts', 'Maximum failed login attempts before account lock', 1, 0, '5'),
+('lockout_duration', '1800', 'number', 'security', 'Lockout Duration (seconds)', 'Account lockout duration after max attempts (30 minutes default)', 1, 0, '1800'),
+('require_strong_password', '1', 'boolean', 'security', 'Require Strong Passwords', 'Enforce strong password requirements', 1, 0, '1'),
+('password_min_length', '8', 'number', 'security', 'Password Minimum Length', 'Minimum password length requirement', 1, 0, '8'),
+('enable_logging', '1', 'boolean', 'security', 'Enable Activity Logging', 'Log all system activities for audit trail', 1, 0, '1'),
+('log_retention_days', '90', 'number', 'security', 'Log Retention (days)', 'Number of days to keep activity logs', 1, 0, '90');
+
+-- ================================================
+-- TABLE 6: DATABASE VERSION TRACKING
 -- Track database schema versions for migrations
 -- ================================================
 
@@ -185,7 +263,8 @@ INSERT IGNORE INTO `zwicky_admin_users` (
 
 -- Insert current database version
 INSERT IGNORE INTO `zwicky_db_version` (`version`, `description`) VALUES 
-('1.0.0', 'Initial database schema with complete license management system');
+('1.0.0', 'Initial database schema with complete license management system'),
+('1.1.0', 'Added system settings table with comprehensive configuration management');
 
 -- ================================================
 -- SAMPLE DATA (OPTIONAL - REMOVE IN PRODUCTION)
@@ -230,6 +309,7 @@ ANALYZE TABLE `zwicky_licenses`;
 ANALYZE TABLE `zwicky_activations`;
 ANALYZE TABLE `zwicky_admin_users`;
 ANALYZE TABLE `zwicky_logs`;
+ANALYZE TABLE `zwicky_settings`;
 
 -- ================================================
 -- VERIFICATION QUERIES
