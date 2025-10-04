@@ -40,11 +40,15 @@ define('LMS_DB_USER', $_ENV['LMS_DB_USER'] ?? getenv('LMS_DB_USER') ?: 'root');
 define('LMS_DB_PASS', $_ENV['LMS_DB_PASS'] ?? getenv('LMS_DB_PASS') ?: '');
 define('LMS_DB_CHARSET', $_ENV['LMS_DB_CHARSET'] ?? getenv('LMS_DB_CHARSET') ?: 'utf8mb4');
 
+// Table Prefix
+define('LMS_TABLE_PREFIX', 'zwicky_');
+
 // Table Names
 define('LMS_TABLE_LICENSES', 'zwicky_licenses');
 define('LMS_TABLE_ACTIVATIONS', 'zwicky_activations');
 define('LMS_TABLE_ADMIN_USERS', 'zwicky_admin_users');
 define('LMS_TABLE_LOGS', 'zwicky_logs');
+define('LMS_TABLE_SETTINGS', 'zwicky_settings');
 
 // Database connection options
 $db_options = [

@@ -113,6 +113,9 @@ define('LMS_THEME_STATUS_URL', LMS_API_URL . '/status');
 define('LMS_DEBUG_MODE', filter_var($_ENV['LMS_DEBUG_MODE'] ?? getenv('LMS_DEBUG_MODE') ?: 'false', FILTER_VALIDATE_BOOLEAN));
 define('LMS_MAINTENANCE_MODE', filter_var($_ENV['LMS_MAINTENANCE_MODE'] ?? getenv('LMS_MAINTENANCE_MODE') ?: 'false', FILTER_VALIDATE_BOOLEAN));
 
+// Environment name for display
+define('LMS_ENVIRONMENT', LMS_DEBUG_MODE ? 'Development' : 'Production');
+
 // Time Zone
 date_default_timezone_set('UTC');
 
