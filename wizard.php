@@ -12,7 +12,273 @@ session_start();
 // Check if already installed
 $lockFile = __DIR__ . '/install.lock';
 if (file_exists($lockFile)) {
-    header('Location: admin/login.php');
+    // Show "Already Installed" page instead of redirecting
+    ?>
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Already Installed - Zwicky License Manager</title>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            
+            body {
+                font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 20px;
+            }
+            
+            .message-container {
+                background: white;
+                border-radius: 16px;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+                max-width: 600px;
+                width: 100%;
+                overflow: hidden;
+                animation: slideIn 0.5s ease;
+            }
+            
+            @keyframes slideIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(30px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+            
+            .message-header {
+                background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                padding: 40px;
+                text-align: center;
+                color: white;
+            }
+            
+            .success-icon {
+                width: 80px;
+                height: 80px;
+                background: rgba(255, 255, 255, 0.2);
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: 0 auto 20px;
+                font-size: 40px;
+                animation: scaleIn 0.5s ease;
+            }
+            
+            @keyframes scaleIn {
+                from {
+                    transform: scale(0);
+                }
+                to {
+                    transform: scale(1);
+                }
+            }
+            
+            .message-header h1 {
+                font-size: 28px;
+                font-weight: 700;
+                margin-bottom: 8px;
+            }
+            
+            .message-header p {
+                font-size: 16px;
+                opacity: 0.9;
+            }
+            
+            .message-content {
+                padding: 40px;
+            }
+            
+            .info-box {
+                background: #f0fdf4;
+                border: 1px solid #86efac;
+                border-left: 4px solid #10b981;
+                padding: 20px;
+                border-radius: 8px;
+                margin-bottom: 25px;
+            }
+            
+            .info-box h3 {
+                color: #15803d;
+                font-size: 18px;
+                margin-bottom: 12px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            
+            .info-box p {
+                color: #166534;
+                line-height: 1.6;
+                margin-bottom: 8px;
+            }
+            
+            .warning-box {
+                background: #fffbeb;
+                border: 1px solid #fcd34d;
+                border-left: 4px solid #f59e0b;
+                padding: 20px;
+                border-radius: 8px;
+                margin-bottom: 25px;
+            }
+            
+            .warning-box h3 {
+                color: #d97706;
+                font-size: 16px;
+                margin-bottom: 10px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            
+            .warning-box p {
+                color: #92400e;
+                line-height: 1.6;
+                font-size: 14px;
+            }
+            
+            .warning-box code {
+                background: #fef3c7;
+                padding: 2px 6px;
+                border-radius: 4px;
+                font-family: 'Courier New', monospace;
+                font-size: 13px;
+            }
+            
+            .btn-group {
+                display: flex;
+                gap: 12px;
+                flex-wrap: wrap;
+            }
+            
+            .btn {
+                padding: 14px 24px;
+                border: none;
+                border-radius: 8px;
+                font-size: 16px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.2s;
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                text-decoration: none;
+                flex: 1;
+                justify-content: center;
+                min-width: 150px;
+            }
+            
+            .btn-primary {
+                background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+                color: white;
+            }
+            
+            .btn-primary:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 8px 16px rgba(37, 99, 235, 0.3);
+            }
+            
+            .btn-secondary {
+                background: #f1f5f9;
+                color: #475569;
+            }
+            
+            .btn-secondary:hover {
+                background: #e2e8f0;
+            }
+            
+            .btn-danger {
+                background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+                color: white;
+            }
+            
+            .btn-danger:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 8px 16px rgba(239, 68, 68, 0.3);
+            }
+            
+            .install-date {
+                text-align: center;
+                color: #64748b;
+                font-size: 14px;
+                margin-top: 20px;
+                padding-top: 20px;
+                border-top: 1px solid #e2e8f0;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="message-container">
+            <div class="message-header">
+                <div class="success-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <h1>System Already Installed</h1>
+                <p>Installation wizard is not available</p>
+            </div>
+            
+            <div class="message-content">
+                <div class="info-box">
+                    <h3>
+                        <i class="fas fa-info-circle"></i>
+                        Installation Complete
+                    </h3>
+                    <p><strong>Good news!</strong> Your Zwicky License Management System has already been successfully installed and configured.</p>
+                    <p>The installation wizard can only be run once for security reasons. If you need to access the admin panel, please use the login page.</p>
+                </div>
+                
+                <div class="btn-group">
+                    <a href="admin/login.php" class="btn btn-primary">
+                        <i class="fas fa-sign-in-alt"></i>
+                        Go to Admin Login
+                    </a>
+                    <a href="admin/dashboard.php" class="btn btn-secondary">
+                        <i class="fas fa-home"></i>
+                        Dashboard
+                    </a>
+                </div>
+                
+                <div class="warning-box">
+                    <h3>
+                        <i class="fas fa-tools"></i>
+                        Need to Reinstall?
+                    </h3>
+                    <p>
+                        If you need to reinstall the system, you must first delete the <code>install.lock</code> file from the root directory. 
+                        <strong>Warning:</strong> This will allow the installation wizard to run again, but will not delete your existing data.
+                    </p>
+                    <p style="margin-top: 10px;">
+                        <strong>Steps to reinstall:</strong><br>
+                        1. Backup your database<br>
+                        2. Delete the <code>install.lock</code> file<br>
+                        3. Visit this page again to run the wizard
+                    </p>
+                </div>
+                
+                <div class="install-date">
+                    <i class="fas fa-calendar"></i>
+                    Originally installed on: <strong><?php echo date('F j, Y \a\t g:i A', filemtime($lockFile)); ?></strong>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+    <?php
     exit;
 }
 
